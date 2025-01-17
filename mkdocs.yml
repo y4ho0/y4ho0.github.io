@@ -1,0 +1,12 @@
+site_name: Yahoo
+nav: 
+  - Homepage: index.md
+  - Tutorial: 
+    - C: Tutorial/C.md
+    - Java: Tutorial/Java.md
+    - Python: Tutorial/Python.md
+  - About me: about.md
+theme:
+  name: material
+
+
