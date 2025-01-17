@@ -29,7 +29,7 @@ theme:
       toggle:
         icon: material/toggle-switch
         name: Switch to light mode
-      primary: blue gray
+      primary: blue-grey
       accent: lime
 
 
