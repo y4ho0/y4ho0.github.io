@@ -197,6 +197,8 @@
   display: none;
 }
 
+.daily-quote[data-quote-animation="pending"] .daily-quote__sizer,
+.daily-quote[data-quote-animation="waiting"] .daily-quote__sizer,
 .daily-quote[data-quote-animation="typing"] .daily-quote__sizer,
 .daily-quote[data-quote-animation="complete"] .daily-quote__sizer {
   visibility: hidden;
@@ -251,9 +253,16 @@
 
 .daily-quote figcaption a { color: inherit; }
 
+.daily-quote[data-quote-animation="pending"] figcaption,
+.daily-quote[data-quote-animation="waiting"] figcaption,
 .daily-quote[data-quote-animation="typing"] figcaption {
   opacity: 0;
   transform: translateY(0.25rem);
+}
+
+@media (scripting: none) {
+  .daily-quote[data-quote-animation] .daily-quote__sizer { visibility: visible; }
+  .daily-quote[data-quote-animation] figcaption { opacity: 1; transform: none; }
 }
 
 @keyframes quote-cursor-pulse {

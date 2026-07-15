@@ -56,101 +56,233 @@ const quoteSize = quoteLength <= shortLimit ? "short" : quoteLength > longLimit 
 )}
 
 <script>
-  const figure = document.querySelector<HTMLElement>(".daily-quote[data-quote-animation]");
-  const output = figure?.querySelector<HTMLElement>(".daily-quote__output");
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-  function showDirectly() {
-    if (figure) figure.dataset.quoteAnimation = "direct";
-  }
-
-  if (figure && output) {
+  function initializeQuoteAnimation() {
+    const figure = document.querySelector<HTMLElement>(".daily-quote[data-quote-animation]");
+    if (!figure) return;
+    const output = figure.querySelector<HTMLElement>(".daily-quote__output");
+    if (!output) return;
     const quoteFigure = figure;
     const quoteOutput = output;
+
+    const existingState = quoteFigure.dataset.quoteAnimation;
+    if (existingState === "typing" || existingState === "complete" || existingState === "direct") return;
+
     const text = quoteFigure.dataset.quoteText ?? "";
     const language = quoteFigure.dataset.quoteLanguage ?? "en";
-    const date = quoteFigure.dataset.quoteDate ?? "undated";
-    const storageKey = `garden-quote-seen:${date}`;
-    let seen = false;
+    const characters = Array.from(text);
+    const totalDuration = Math.min(3600, Math.max(1100, 700 + characters.length * 25));
+    const stepDuration = totalDuration / Math.max(1, characters.length);
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-    try {
-      seen = sessionStorage.getItem(storageKey) === "1";
-    } catch {
-      seen = false;
+    let started = false;
+    let startQueued = false;
+    let quoteIsInViewport = false;
+    let index = 0;
+    let accumulatedTime = 0;
+    let lastFrameTime = 0;
+    let typingFrame = 0;
+    let firstPaintFrame = 0;
+    let secondPaintFrame = 0;
+    let currentWord: HTMLSpanElement | null = null;
+    let observer: IntersectionObserver | null = null;
+    let usingViewportFallback = false;
+
+    quoteFigure.dataset.quoteAnimation = "waiting";
+    quoteOutput.replaceChildren();
+
+    function stopViewportWatch() {
+      observer?.disconnect();
+      observer = null;
+      if (usingViewportFallback) {
+        window.removeEventListener("scroll", checkViewportFallback);
+        window.removeEventListener("resize", checkViewportFallback);
+        usingViewportFallback = false;
+      }
     }
 
-    if (!text || seen || reduceMotion.matches) {
+    function cancelQueuedStart() {
+      if (firstPaintFrame) cancelAnimationFrame(firstPaintFrame);
+      if (secondPaintFrame) cancelAnimationFrame(secondPaintFrame);
+      firstPaintFrame = 0;
+      secondPaintFrame = 0;
+      startQueued = false;
+    }
+
+    function stopTypingFrame() {
+      if (typingFrame) cancelAnimationFrame(typingFrame);
+      typingFrame = 0;
+      lastFrameTime = 0;
+    }
+
+    function showDirectly() {
+      started = true;
+      cancelQueuedStart();
+      stopTypingFrame();
+      stopViewportWatch();
+      quoteOutput.replaceChildren();
+      quoteFigure.dataset.quoteAnimation = "direct";
+    }
+
+    function appendCharacter(character: string) {
+      if (/\s/u.test(character)) {
+        quoteOutput.append(document.createTextNode(character));
+        currentWord = null;
+        return;
+      }
+
+      const characterElement = document.createElement("span");
+      characterElement.className = "daily-quote__character";
+      characterElement.textContent = character;
+      if (language === "en") {
+        if (!currentWord) {
+          currentWord = document.createElement("span");
+          currentWord.className = "daily-quote__word";
+          quoteOutput.append(currentWord);
+        }
+        currentWord.append(characterElement);
+      } else {
+        quoteOutput.append(characterElement);
+      }
+      characterElement.animate(
+        [
+          { opacity: 0, transform: "translateY(0.12em)" },
+          { opacity: 1, transform: "translateY(0)" },
+        ],
+        { duration: Math.min(180, Math.max(90, stepDuration * 2.4)), easing: "ease-out", fill: "both" },
+      );
+    }
+
+    function requestTypingFrame() {
+      if (
+        typingFrame
+        || document.visibilityState !== "visible"
+        || quoteFigure.dataset.quoteAnimation !== "typing"
+      ) return;
+      typingFrame = requestAnimationFrame(typeFrame);
+    }
+
+    function typeFrame(time: number) {
+      typingFrame = 0;
+      if (reduceMotion.matches) {
+        showDirectly();
+        return;
+      }
+      if (document.visibilityState !== "visible") {
+        lastFrameTime = 0;
+        return;
+      }
+
+      if (lastFrameTime) {
+        accumulatedTime += Math.min(time - lastFrameTime, stepDuration * 2);
+      }
+      lastFrameTime = time;
+
+      let charactersThisFrame = Math.min(2, Math.floor(accumulatedTime / stepDuration));
+      while (index < characters.length && charactersThisFrame > 0) {
+        appendCharacter(characters[index]);
+        index += 1;
+        charactersThisFrame -= 1;
+        accumulatedTime -= stepDuration;
+      }
+
+      if (index < characters.length) {
+        requestTypingFrame();
+      } else {
+        quoteFigure.dataset.quoteAnimation = "complete";
+      }
+    }
+
+    function startTyping() {
+      if (started || reduceMotion.matches || document.visibilityState !== "visible" || !quoteIsInViewport) return;
+      started = true;
+      stopViewportWatch();
+      quoteOutput.replaceChildren();
+      quoteFigure.dataset.quoteAnimation = "typing";
+      accumulatedTime = stepDuration;
+      requestTypingFrame();
+    }
+
+    function canStart() {
+      return !started
+        && !reduceMotion.matches
+        && document.visibilityState === "visible"
+        && quoteIsInViewport;
+    }
+
+    function tryStart() {
+      if (startQueued || !canStart()) return;
+      startQueued = true;
+      firstPaintFrame = requestAnimationFrame(() => {
+        firstPaintFrame = 0;
+        if (!canStart()) {
+          startQueued = false;
+          return;
+        }
+        secondPaintFrame = requestAnimationFrame(() => {
+          secondPaintFrame = 0;
+          startQueued = false;
+          if (canStart()) startTyping();
+        });
+      });
+    }
+
+    function checkViewportFallback() {
+      const bounds = quoteFigure.getBoundingClientRect();
+      const visibleHeight = Math.max(0, Math.min(bounds.bottom, window.innerHeight) - Math.max(bounds.top, 0));
+      const referenceHeight = Math.max(1, Math.min(bounds.height, window.innerHeight));
+      quoteIsInViewport = bounds.width > 0 && visibleHeight / referenceHeight >= 0.35;
+      if (!quoteIsInViewport) cancelQueuedStart();
+      tryStart();
+    }
+
+    function watchViewport() {
+      const supportsIntersectionObserver = typeof window.IntersectionObserver === "function";
+      if (supportsIntersectionObserver) {
+        observer = new IntersectionObserver((entries) => {
+          const entry = entries[0];
+          quoteIsInViewport = Boolean(entry?.isIntersecting && entry.intersectionRatio >= 0.35);
+          if (!quoteIsInViewport) cancelQueuedStart();
+          tryStart();
+        }, { threshold: [0, 0.35] });
+        observer.observe(quoteFigure);
+      } else {
+        usingViewportFallback = true;
+        window.addEventListener("scroll", checkViewportFallback, { passive: true });
+        window.addEventListener("resize", checkViewportFallback, { passive: true });
+        checkViewportFallback();
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState !== "visible") {
+        cancelQueuedStart();
+        stopTypingFrame();
+        return;
+      }
+      if (quoteFigure.dataset.quoteAnimation === "typing") {
+        requestTypingFrame();
+      } else {
+        tryStart();
+      }
+    }
+
+    reduceMotion.addEventListener("change", () => {
+      if (reduceMotion.matches) showDirectly();
+    });
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pageshow", (event) => {
+      const state = quoteFigure.dataset.quoteAnimation;
+      if (event.persisted && (state === "complete" || state === "direct")) return;
+      if (state === "typing") requestTypingFrame();
+      else tryStart();
+    });
+
+    if (!text || reduceMotion.matches) {
       showDirectly();
     } else {
-      try {
-        sessionStorage.setItem(storageKey, "1");
-      } catch {
-        // The animation remains a progressive enhancement when storage is unavailable.
-      }
-
-      quoteFigure.dataset.quoteAnimation = "typing";
-      const characters = Array.from(text);
-      const totalDuration = Math.min(3600, Math.max(1100, 700 + characters.length * 25));
-      const stepDuration = totalDuration / Math.max(1, characters.length);
-      let index = 0;
-      let startedAt = 0;
-      let currentWord: HTMLSpanElement | null = null;
-
-      function appendCharacter(character: string) {
-        if (/\s/u.test(character)) {
-          quoteOutput.append(document.createTextNode(character));
-          currentWord = null;
-          return;
-        }
-
-        const characterElement = document.createElement("span");
-        characterElement.className = "daily-quote__character";
-        characterElement.textContent = character;
-        if (language === "en") {
-          if (!currentWord) {
-            currentWord = document.createElement("span");
-            currentWord.className = "daily-quote__word";
-            quoteOutput.append(currentWord);
-          }
-          currentWord.append(characterElement);
-        } else {
-          quoteOutput.append(characterElement);
-        }
-        characterElement.animate(
-          [
-            { opacity: 0, transform: "translateY(0.12em)" },
-            { opacity: 1, transform: "translateY(0)" },
-          ],
-          { duration: Math.min(180, Math.max(90, stepDuration * 2.4)), easing: "ease-out", fill: "both" },
-        );
-      }
-
-      function typeFrame(time: number) {
-        if (reduceMotion.matches) {
-          quoteOutput.replaceChildren();
-          showDirectly();
-          return;
-        }
-        if (!startedAt) startedAt = time;
-        const target = Math.min(characters.length, Math.floor((time - startedAt) / stepDuration) + 1);
-        while (index < target) {
-          appendCharacter(characters[index]);
-          index += 1;
-        }
-        if (index < characters.length) {
-          requestAnimationFrame(typeFrame);
-        } else {
-          quoteFigure.dataset.quoteAnimation = "complete";
-        }
-      }
-
-      reduceMotion.addEventListener("change", () => {
-        if (reduceMotion.matches) {
-          quoteOutput.replaceChildren();
-          showDirectly();
-        }
-      }, { once: true });
-      requestAnimationFrame(typeFrame);
+      watchViewport();
     }
   }
+
+  initializeQuoteAnimation();
 </script>

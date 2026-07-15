@@ -8,7 +8,7 @@
   const narrowScreen = window.matchMedia("(max-width: 48rem)");
   const phoneScreen = window.matchMedia("(max-width: 30rem)");
   const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
-  const glyphs = [
+  const ambientGlyphs = [
     "0", "1", "λ", "π", "∑", "#", "$", "%", "&", "@", "!", "?", "=", "-", "_",
     ":", ";", "(", ")", "[", "]", "{", "}", "<", ">", "/", "+", "·", "*", "^", "|", "~", "≈",
   ];
@@ -71,6 +71,10 @@
     x: number;
     y: number;
     role: number;
+    strokeId: number;
+    angle?: number;
+    radius?: number;
+    glyph?: string;
   }
 
   interface CharacterCloud {
@@ -104,7 +108,10 @@
   let paintedFrames = 0;
   let startedAt = performance.now();
   let pointerStrength = 0;
+  let strokeSequence = 0;
   const pointer = { x: 0, y: 0, active: false };
+  const pointerRepulsionRadius = 92;
+  const pointerRepulsionDistance = 20;
   let clouds: CharacterCloud[] = [];
   let readingZones: ReadingZone[] = [];
 
@@ -114,9 +121,11 @@
   }
 
   function line(x1: number, y1: number, x2: number, y2: number, count: number, role = 0) {
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const strokeId = strokeSequence++;
     return Array.from({ length: count }, (_, index) => {
       const progress = count === 1 ? 0 : index / (count - 1);
-      return { x: x1 + (x2 - x1) * progress, y: y1 + (y2 - y1) * progress, role };
+      return { x: x1 + (x2 - x1) * progress, y: y1 + (y2 - y1) * progress, role, angle, strokeId };
     });
   }
 
@@ -131,6 +140,7 @@
     start = 0,
     end = Math.PI * 2,
   ) {
+    const strokeId = strokeSequence++;
     const cosine = Math.cos(rotation);
     const sine = Math.sin(rotation);
     return Array.from({ length: count }, (_, index) => {
@@ -138,10 +148,15 @@
       const angle = start + (end - start) * progress;
       const localX = Math.cos(angle) * radiusX;
       const localY = Math.sin(angle) * radiusY;
+      const tangentX = -Math.sin(angle) * radiusX;
+      const tangentY = Math.cos(angle) * radiusY;
       return {
         x: centerX + localX * cosine - localY * sine,
         y: centerY + localX * sine + localY * cosine,
         role,
+        strokeId,
+        angle: Math.atan2(tangentX * sine + tangentY * cosine, tangentX * cosine - tangentY * sine),
+        radius: Math.max(radiusX, radiusY),
       };
     });
   }
@@ -156,13 +171,18 @@
     count: number,
     role = 0,
   ) {
+    const strokeId = strokeSequence++;
     return Array.from({ length: count }, (_, index) => {
       const progress = count === 1 ? 0 : index / (count - 1);
       const inverse = 1 - progress;
+      const tangentX = 2 * inverse * (controlX - x1) + 2 * progress * (x2 - controlX);
+      const tangentY = 2 * inverse * (controlY - y1) + 2 * progress * (y2 - controlY);
       return {
         x: inverse * inverse * x1 + 2 * inverse * progress * controlX + progress * progress * x2,
         y: inverse * inverse * y1 + 2 * inverse * progress * controlY + progress * progress * y2,
         role,
+        strokeId,
+        angle: Math.atan2(tangentY, tangentX),
       };
     });
   }
@@ -303,6 +323,8 @@
     }
     if (kind === "dna") {
       const strandLength = 42;
+      const strandAStroke = strokeSequence++;
+      const strandBStroke = strokeSequence++;
       const strandA = Array.from({ length: strandLength }, (_, index) => {
         const progress = index / (strandLength - 1);
         const angle = 0.55 + progress * Math.PI * 3.2;
@@ -310,6 +332,8 @@
           x: Math.sin(angle) * 0.23,
           y: -0.46 + progress * 0.92,
           role: Math.cos(angle) > 0 ? 0 : 2,
+          strokeId: strandAStroke,
+          angle: Math.atan2(0.92, Math.cos(angle) * 0.23 * Math.PI * 3.2),
         };
       });
       const strandB = Array.from({ length: strandLength }, (_, index) => {
@@ -319,6 +343,8 @@
           x: Math.sin(angle) * 0.23,
           y: -0.46 + progress * 0.92,
           role: Math.cos(angle) > 0 ? 1 : 2,
+          strokeId: strandBStroke,
+          angle: Math.atan2(0.92, Math.cos(angle) * 0.23 * Math.PI * 3.2),
         };
       });
       const rungs = Array.from({ length: 10 }, (_, index) => {
@@ -416,10 +442,17 @@
         ...polyline([[-0.11, 0.27], [0, 0.46], [0.11, 0.27]], 9),
       ];
     }
+    const gearStroke = strokeSequence++;
     const gearOutline = Array.from({ length: 40 }, (_, index) => {
       const angle = (index / 40) * Math.PI * 2;
       const radius = index % 4 < 2 ? 0.42 : 0.34;
-      return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, role: index % 2 };
+      return {
+        x: Math.cos(angle) * radius,
+        y: Math.sin(angle) * radius,
+        role: index % 2,
+        strokeId: gearStroke,
+        angle: angle + Math.PI / 2,
+      };
     });
     return [
       ...gearOutline,
@@ -428,17 +461,123 @@
     ];
   }
 
-  function normalizedTargets(kind: ShapeKind) {
-    const points = shapePoints(kind);
-    const shapeScale = kind === "dna" ? 1.22 : 1;
-    return Array.from({ length: particleCount }, (_, index) => {
-      const source = points[Math.floor((index / particleCount) * points.length) % points.length];
-      const jitter = (seeded(index * 17 + kind.length * 31) - 0.5) * 0.012;
-      return { x: source.x * shapeScale + jitter, y: source.y * shapeScale - jitter, role: source.role };
+  function entityGlyph(kind: ShapeKind, point: ShapePoint, pointIndex: number) {
+    const primarySymbols = ["$", "%", "&", "@", "#", "0", "1"] as const;
+    const groupingSymbols = ["{", "}", "[", "]", "(", ")", "<", ">"] as const;
+    const operatorSymbols = ["+", "*", "=", "?", "!", "^", "~", ":", ";", "/"] as const;
+    const nodeSymbols = ["@", "#", "*", "+", "0"] as const;
+    const seed = seeded(
+      pointIndex * 41
+      + point.strokeId * 23
+      + shapeKinds.indexOf(kind) * 97
+      + point.role * 17
+      + 0.23,
+    );
+    const choose = (symbols: readonly string[]) => symbols[Math.floor(seed * symbols.length) % symbols.length];
+
+    if (point.radius !== undefined && point.radius <= 0.12 && pointIndex % 3 === 0) return choose(nodeSymbols);
+    if (kind === "gear" && pointIndex % 6 === 0) return choose(["#", "%", "*", "+"]);
+    if (point.role === 1) return choose(groupingSymbols);
+    if (point.role >= 2) return choose(operatorSymbols);
+    return choose(primarySymbols);
+  }
+
+  function strokeLength(points: ShapePoint[]) {
+    let length = 0;
+    for (let index = 1; index < points.length; index += 1) {
+      length += Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y);
+    }
+    return length;
+  }
+
+  function resampleStroke(points: ShapePoint[], count: number) {
+    if (count <= 0 || points.length === 0) return [];
+    if (points.length === 1 || count === 1) return [{ ...points[Math.floor(points.length / 2)] }];
+
+    const cumulative = [0];
+    for (let index = 1; index < points.length; index += 1) {
+      cumulative.push(cumulative[index - 1] + Math.hypot(
+        points[index].x - points[index - 1].x,
+        points[index].y - points[index - 1].y,
+      ));
+    }
+    const totalLength = cumulative[cumulative.length - 1];
+    if (totalLength <= Number.EPSILON) return Array.from({ length: count }, () => ({ ...points[0] }));
+
+    const closed = Math.hypot(
+      points[0].x - points[points.length - 1].x,
+      points[0].y - points[points.length - 1].y,
+    ) < 0.0001;
+    let segment = 1;
+    return Array.from({ length: count }, (_, index) => {
+      const targetDistance = (index / (closed ? count : count - 1)) * totalLength;
+      while (segment < cumulative.length - 1 && cumulative[segment] < targetDistance) segment += 1;
+      const from = points[segment - 1];
+      const to = points[segment];
+      const segmentLength = Math.max(Number.EPSILON, cumulative[segment] - cumulative[segment - 1]);
+      const progress = (targetDistance - cumulative[segment - 1]) / segmentLength;
+      return {
+        x: from.x + (to.x - from.x) * progress,
+        y: from.y + (to.y - from.y) * progress,
+        role: from.role,
+        strokeId: from.strokeId,
+        angle: from.angle ?? to.angle,
+        radius: from.radius ?? to.radius,
+      };
     });
   }
 
+  function normalizedTargets(kind: ShapeKind) {
+    const points = shapePoints(kind);
+    const shapeScale = kind === "dna" ? 1.22 : 1;
+    const grouped = new Map<number, ShapePoint[]>();
+    points.forEach((point) => {
+      const stroke = grouped.get(point.strokeId) ?? [];
+      stroke.push(point);
+      grouped.set(point.strokeId, stroke);
+    });
+    const strokes = Array.from(grouped.values());
+    const lengths = strokes.map(strokeLength);
+    const minimumCounts: number[] = strokes.map((stroke, index) => {
+      const isLoop = stroke[0].radius !== undefined;
+      if (isLoop) return lengths[index] < 0.35 ? 4 : 6;
+      return lengths[index] < 0.14 ? 2 : 3;
+    });
+    let counts: number[] = [...minimumCounts];
+    if (counts.reduce((total, count) => total + count, 0) > particleCount) {
+      counts = strokes.map(() => 1);
+    }
+
+    const roleWeights = strokes.map((stroke) => stroke[0].role === 0 ? 1.3 : stroke[0].role === 1 ? 1 : 0.78);
+    const scores = lengths.map((length, index) => Math.max(0.025, length) * roleWeights[index]);
+    const scoreTotal = scores.reduce((total, score) => total + score, 0);
+    const used = counts.reduce((total, count) => total + count, 0);
+    const remaining = Math.max(0, particleCount - used);
+    const exactExtras = scores.map((score) => remaining * score / Math.max(Number.EPSILON, scoreTotal));
+    exactExtras.forEach((extra, index) => { counts[index] += Math.floor(extra); });
+    let leftovers = particleCount - counts.reduce((total, count) => total + count, 0);
+    const remainderOrder = exactExtras
+      .map((extra, index) => ({ index, remainder: extra - Math.floor(extra) }))
+      .sort((first, second) => second.remainder - first.remainder);
+    for (let index = 0; index < leftovers; index += 1) {
+      counts[remainderOrder[index % remainderOrder.length].index] += 1;
+    }
+
+    return strokes.flatMap((stroke, strokeIndex) => (
+      resampleStroke(stroke, counts[strokeIndex]).map((source, pointIndex) => ({
+        x: source.x * shapeScale,
+        y: source.y * shapeScale,
+        role: source.role,
+        strokeId: source.strokeId,
+        angle: source.angle,
+        radius: source.radius,
+        glyph: entityGlyph(kind, source, pointIndex),
+      }))
+    ));
+  }
+
   function buildTargetRecord() {
+    strokeSequence = 0;
     return Object.fromEntries(shapeKinds.map((kind) => [kind, normalizedTargets(kind)])) as Record<ShapeKind, ShapePoint[]>;
   }
 
@@ -703,7 +842,7 @@
     const compact = narrowScreen.matches;
     const phone = phoneScreen.matches;
     const entityCount = responsiveEntityCount();
-    particleCount = phone ? 80 : compact ? 86 : 92;
+    particleCount = phone ? 96 : compact ? 110 : 120;
     const sizes = Array.from({ length: entityCount }, () => (
       phone
         ? randomBetween(120, 138)
@@ -753,6 +892,12 @@
     context.setTransform(deviceScale, 0, 0, deviceScale, 0, 0);
     canvas.dataset.canvasSize = `${Math.round(width)}x${Math.round(height)}@${deviceScale}`;
     canvas.dataset.canvasMode = "morphing-character-clouds";
+    canvas.dataset.glyphMode = "program-symbol-entities";
+    canvas.dataset.structuralGlyphs = "$%&@#01{}[]()<>+*=?!^~:;";
+    canvas.dataset.codeGlyphShare = "stable:76%,shifting:24%";
+    canvas.dataset.samplingMode = "stroke-length-priority";
+    canvas.dataset.pointerInteraction = "local-symbol-repulsion";
+    canvas.dataset.pointerRepulsion = `${pointerRepulsionRadius}px/${pointerRepulsionDistance}px`;
     canvas.dataset.motionMode = "floating+brownian+model-relocation";
     canvas.dataset.minimumObjectGap = minimumObjectGap.toFixed(2);
     canvas.dataset.layoutSafetyBuffer = String(layoutSafetyBuffer);
@@ -768,6 +913,7 @@
     canvas.dataset.librarySize = String(shapeKinds.length);
     canvas.dataset.requestedEntityCount = String(responsiveEntityCount());
     canvas.dataset.entityCount = String(clouds.length);
+    canvas.dataset.particlesPerEntity = String(particleCount);
     canvas.dataset.objectSizes = clouds.map((cloud) => cloud.size.toFixed(1)).join(",");
     draw(performance.now());
   }
@@ -811,7 +957,7 @@
     };
   }
 
-  function cloudOffset(cloud: CharacterCloud, time: number, anchor: { x: number; y: number }) {
+  function cloudOffset(cloud: CharacterCloud, time: number) {
     if (reducedMotion.matches) return { x: 0, y: 0, angle: 0 };
     if (cloud.motionUpdatedAt === 0) cloud.motionUpdatedAt = time;
     const deltaSeconds = Math.min(0.05, Math.max(0, (time - cloud.motionUpdatedAt) / 1000));
@@ -838,19 +984,6 @@
     let x = Math.sin(drift * 0.83) * 4.5 + cloud.brownianX;
     let y = Math.cos(drift * 0.61) * 6 + cloud.brownianY;
     const angle = Math.sin(drift * 0.47 + cloud.phase * 0.3) * 0.018 + (cloud.brownianX - cloud.brownianY) * 0.0012;
-    if (pointerStrength > 0.001) {
-      const centerX = anchor.x * width;
-      const centerY = anchor.y * height;
-      const deltaX = pointer.x - centerX;
-      const deltaY = pointer.y - centerY;
-      const distance = Math.max(1, Math.hypot(deltaX, deltaY));
-      const radius = Math.min(190, Math.max(125, width * 0.16));
-      if (distance < radius) {
-        const force = ((radius - distance) / radius) * 2.4 * pointerStrength;
-        x -= (deltaX / distance) * force;
-        y -= (deltaY / distance) * force;
-      }
-    }
     return { x, y, angle };
   }
 
@@ -904,7 +1037,7 @@
       const centerX = modelPosition.x * width;
       const centerY = modelPosition.y * height;
       modelPositionSamples.push(`${modelPosition.x.toFixed(3)},${modelPosition.y.toFixed(3)}`);
-      const drift = cloudOffset(cloud, time, modelPosition);
+      const drift = cloudOffset(cloud, time);
       const fromTargets = cloud.targets[state.from];
       const toTargets = cloud.targets[state.to];
       if (!state.forming) formedObjects += 1;
@@ -924,20 +1057,60 @@
         const scatterRadius = cloud.size * (0.42 + seeded(particleIndex + cloudIndex * 73) * 0.72);
         const startX = centerX + Math.cos(angle) * scatterRadius;
         const startY = centerY + Math.sin(angle) * scatterRadius * 0.76;
-        const x = startX + (targetX - startX) * formationProgress;
-        const y = startY + (targetY - startY) * formationProgress;
+        let x = startX + (targetX - startX) * formationProgress;
+        let y = startY + (targetY - startY) * formationProgress;
+        if (pointerStrength > 0.001 && finePointer.matches && !reducedMotion.matches) {
+          let deltaX = x - pointer.x;
+          let deltaY = y - pointer.y;
+          let distance = Math.hypot(deltaX, deltaY);
+          const radius = narrowScreen.matches ? pointerRepulsionRadius * 0.82 : pointerRepulsionRadius;
+          if (distance < radius) {
+            if (distance < 0.5) {
+              const escapeAngle = seeded(particleIndex * 59 + cloudIndex * 137) * Math.PI * 2;
+              deltaX = Math.cos(escapeAngle);
+              deltaY = Math.sin(escapeAngle);
+              distance = 1;
+            }
+            const proximity = 1 - distance / radius;
+            const force = proximity * proximity * pointerRepulsionDistance * pointerStrength;
+            x += (deltaX / distance) * force;
+            y += (deltaY / distance) * force;
+          }
+        }
         const cadence = state.forming || state.morphing ? 105 : 1040 + (particleIndex % 6) * 135;
         const glyphStep = reducedMotion.matches ? 0 : Math.floor(Math.max(0, elapsed) / cadence);
-        const glyph = glyphs[(Math.floor(seed * glyphs.length) + glyphStep) % glyphs.length];
-        const role = state.progress > 0.5 ? toTarget.role : fromTarget.role;
+        const ambientGlyph = ambientGlyphs[(Math.floor(seed * ambientGlyphs.length) + glyphStep) % ambientGlyphs.length];
+        const activeTarget = state.progress > 0.5 ? toTarget : fromTarget;
+        const activeKind = state.progress > 0.5 ? state.to : state.from;
+        const stableEntityGlyph = activeTarget.glyph;
+        const role = activeTarget.role;
+        const structureStrength = state.forming
+          ? formationProgress
+          : state.morphing
+            ? Math.abs(state.progress - 0.5) * 2
+            : 1;
+        const stableAnchor = particleIndex % 7 === 0;
+        const shiftingGlyphRatio = role === 0 ? 0.22 : 0.28;
+        const mixSeed = seeded(
+          particleIndex * 29
+          + cloudIndex * 131
+          + shapeKinds.indexOf(activeKind) * 73
+          + 0.37,
+        );
+        const useShiftingGlyph = !stableAnchor && mixSeed < shiftingGlyphRatio;
+        const settledGlyph = useShiftingGlyph ? ambientGlyph : stableEntityGlyph;
+        const glyph = structureStrength >= 0.58 && settledGlyph ? settledGlyph : ambientGlyph;
         const formationAlpha = state.forming ? Math.min(1, state.progress * 6) : 1;
         const morphDip = state.morphing ? 1 - Math.sin(state.progress * Math.PI) * 0.18 : 1;
         const breath = reducedMotion.matches ? 0 : Math.sin(time * 0.00032 + seed * 9) * 0.022;
+        const settledAlpha = state.forming || state.morphing
+          ? role ? 0.58 : 0.68
+          : role ? 0.68 : 0.78;
 
         context.save();
-        context.globalAlpha = ((role ? 0.47 : 0.58) * formationAlpha * morphDip) + breath;
+        context.globalAlpha = (settledAlpha * formationAlpha * morphDip) + breath;
         context.fillStyle = colors[(cloud.color + role) % colors.length];
-        context.font = `520 ${narrowScreen.matches ? 10.6 : 11.4}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+        context.font = `600 ${narrowScreen.matches ? 11.2 : 12}px ui-monospace, SFMono-Regular, Menlo, monospace`;
         context.textAlign = "center";
         context.textBaseline = "middle";
         context.fillText(glyph, x, y);
