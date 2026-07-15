@@ -1,0 +1,42 @@
+<div class="theme-control" role="group" aria-label="Color theme">
+  <button type="button" data-theme-value="system" aria-pressed="true">System</button>
+  <button type="button" data-theme-value="light" aria-pressed="false">Light</button>
+  <button type="button" data-theme-value="dark" aria-pressed="false">Dark</button>
+</div>
+
+<script>
+  const storageKey = "garden-theme";
+  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-theme-value]"));
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+
+  function readPreference() {
+    const value = localStorage.getItem(storageKey);
+    return value === "light" || value === "dark" ? value : "system";
+  }
+
+  function applyTheme(preference: string) {
+    const resolved = preference === "system" ? (media.matches ? "dark" : "light") : preference;
+    document.documentElement.dataset.theme = resolved;
+    document.documentElement.dataset.themePreference = preference;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", resolved === "dark" ? "#10151c" : "#f4f0e6");
+    buttons.forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.themeValue === preference));
+    });
+  }
+
+  buttons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const preference = button.dataset.themeValue ?? "system";
+      localStorage.setItem(storageKey, preference);
+      applyTheme(preference);
+    });
+  });
+
+  media.addEventListener("change", () => {
+    if (readPreference() === "system") applyTheme("system");
+  });
+
+  applyTheme(readPreference());
+</script>

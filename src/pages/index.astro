@@ -1,0 +1,45 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import AmbientClickEffects from "../components/AmbientClickEffects.astro";
+import ContentCard from "../components/ContentCard.astro";
+import DailyQuote from "../components/DailyQuote.astro";
+import DuckMark from "../components/DuckMark.astro";
+import GlobeEarth from "../components/GlobeEarth.astro";
+import HomeCanvas from "../components/HomeCanvas.astro";
+import { byUpdatedDate, getPostLocationFrequencies, getPublishedCourses, getPublishedLabs } from "../lib/content";
+
+const courses = byUpdatedDate(await getPublishedCourses()).slice(0, 3);
+const labs = byUpdatedDate(await getPublishedLabs()).slice(0, 3);
+const postLocations = await getPostLocationFrequencies();
+const locatedPostCount = postLocations.reduce((total, location) => total + location.count, 0);
+---
+
+<BaseLayout>
+  <section class="hero site-shell" aria-labelledby="home-title" data-click-effect-zone>
+    <HomeCanvas />
+    <div class="hero__inner">
+      <p class="eyebrow">A personal digital garden</p>
+      <h1 id="home-title" class="visually-hidden">y4ho0's Garden</h1>
+      <DailyQuote />
+      <p class="hero__intro">Notes, experiments, and essays grow here when they are ready. Empty beds are left empty on purpose.</p>
+      <a class="hero__link" href="/garden/">Enter the garden <span aria-hidden="true">↗</span></a>
+    </div>
+  </section>
+  <section class="home-globe-panel site-shell" aria-labelledby="home-globe-title" data-click-effect-zone>
+    <div class="home-globe-panel__copy">
+      <p class="eyebrow">Post map</p>
+      <h2 id="home-globe-title">{postLocations.length > 0 ? `${locatedPostCount} located ${locatedPostCount === 1 ? "entry" : "entries"}.` : "A map ready for located posts."}</h2>
+      <p>{postLocations.length > 0 ? "Marker size reflects how often published entries were created at each location. Drag to look around; the globe resumes on its own." : "When a published note, lab, project, or essay opts into a location, it will appear here. No location data is fabricated."}</p>
+      {postLocations.length > 0 && <p class="home-globe-panel__places" aria-label="Post locations">
+        {postLocations.map((location) => <span>{location.name}<strong>{location.count}</strong></span>)}
+      </p>}
+    </div>
+    <GlobeEarth locations={postLocations} />
+  </section>
+  <div class="home-sections site-shell">
+    {courses.length > 0 && <section class="home-section" aria-labelledby="home-courses"><header><p class="eyebrow">Paths</p><h2 id="home-courses">Courses</h2><a href="/courses/">View all</a></header><div class="content-grid">{courses.map((entry) => <ContentCard entry={entry} />)}</div></section>}
+    {labs.length > 0 && <section class="home-section" aria-labelledby="home-labs"><header><p class="eyebrow">Practice</p><h2 id="home-labs">Labs</h2><a href="/labs/">View all</a></header><div class="content-grid">{labs.map((entry) => <ContentCard entry={entry} />)}</div></section>}
+    {courses.length === 0 && labs.length === 0 && <section class="home-empty" aria-labelledby="home-empty-title"><DuckMark size="medium" label="A pixel-art white duck reclining on a peach pillow with one wing bent behind its head" /><div><p class="eyebrow">Current state</p><h2 id="home-empty-title">The beds are ready.</h2><p>Public course and lab cards will appear here when real material exists.</p></div></section>}
+  </div>
+  <AmbientClickEffects />
+</BaseLayout>

@@ -1,0 +1,95 @@
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/source-serif-4-regular.woff2") format("woff2");
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 20rem;
+  scroll-behavior: smooth;
+  background: var(--color-background);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  font-size: 1rem;
+  line-height: 1.7;
+  text-rendering: optimizeLegibility;
+  background-image:
+    radial-gradient(circle at 14% 8%, color-mix(in srgb, var(--color-primary) 7%, transparent) 0 0.08rem, transparent 0.1rem),
+    linear-gradient(90deg, transparent 49.8%, color-mix(in srgb, var(--color-border) 18%, transparent) 50%, transparent 50.2%);
+  background-size: 1.35rem 1.35rem, 100% 100%;
+}
+
+:root[data-theme="dark"] body {
+  background-image:
+    radial-gradient(circle at 14% 8%, color-mix(in srgb, var(--color-dust-blue) 7%, transparent) 0 0.08rem, transparent 0.1rem),
+    linear-gradient(90deg, transparent 49.8%, color-mix(in srgb, var(--color-border) 16%, transparent) 50%, transparent 50.2%);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--color-secondary-text);
+}
+
+img,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: 0.75rem;
+  left: 0.75rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--radius-small);
+  background: var(--color-text);
+  color: var(--color-background);
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

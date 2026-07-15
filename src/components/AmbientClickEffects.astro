@@ -1,0 +1,132 @@
+<div class="ambient-click-layer" aria-hidden="true"></div>
+
+<script>
+  const layer = document.querySelector<HTMLElement>(".ambient-click-layer");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const coarsePointer = window.matchMedia("(pointer: coarse)");
+  const activeGroups: HTMLElement[] = [];
+  let lastGlobalEffect = 0;
+
+  const excludedSelector = [
+    "article",
+    ".prose",
+    "a",
+    "button",
+    "input",
+    "textarea",
+    "select",
+    "dialog",
+    "nav",
+    "pre",
+    "code",
+    "table",
+    "label",
+    "[contenteditable]",
+    "[data-no-click-effect]",
+  ].join(",");
+  const textSelector = "p,h1,h2,h3,h4,h5,h6,blockquote,figcaption,li,dt,dd";
+  const rippleSelector = "button,.button-link,.content-card";
+
+  function colors() {
+    const styles = getComputedStyle(document.documentElement);
+    return ["--click-color-a", "--click-color-b", "--click-color-c"]
+      .map((name) => styles.getPropertyValue(name).trim())
+      .filter(Boolean);
+  }
+
+  function boundedRipple(event: PointerEvent, target: Element) {
+    const host = target.closest<HTMLElement>(rippleSelector);
+    if (!host || reduceMotion.matches) return false;
+    const bounds = host.getBoundingClientRect();
+    const diameter = Math.max(bounds.width, bounds.height) * 1.4;
+    const ripple = document.createElement("span");
+    ripple.className = "interaction-ripple";
+    ripple.style.width = `${diameter}px`;
+    ripple.style.height = `${diameter}px`;
+    ripple.style.left = `${event.clientX - bounds.left}px`;
+    ripple.style.top = `${event.clientY - bounds.top}px`;
+    host.classList.add("interaction-ripple-host");
+    host.append(ripple);
+    const animation = ripple.animate(
+      [
+        { opacity: 0.2, transform: "translate(-50%, -50%) scale(0.08)" },
+        { opacity: 0, transform: "translate(-50%, -50%) scale(1)" },
+      ],
+      { duration: 390, easing: "cubic-bezier(.2,.65,.3,1)" },
+    );
+    animation.finished.finally(() => {
+      ripple.remove();
+      if (!host.querySelector(".interaction-ripple")) host.classList.remove("interaction-ripple-host");
+    });
+    return true;
+  }
+
+  function ambientEffect(event: PointerEvent, target: Element) {
+    if (!layer || reduceMotion.matches || !target.closest("[data-click-effect-zone]")) return;
+    if (target.closest(excludedSelector) || target.closest(textSelector)) return;
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed) return;
+    const now = performance.now();
+    if (now - lastGlobalEffect < 125) return;
+    lastGlobalEffect = now;
+
+    if (activeGroups.length >= 2) activeGroups.shift()?.remove();
+    const group = document.createElement("span");
+    group.className = "ambient-click-group";
+    group.style.left = `${event.clientX}px`;
+    group.style.top = `${event.clientY}px`;
+    const ring = document.createElement("span");
+    ring.className = "ambient-click-ring";
+    const dot = document.createElement("span");
+    dot.className = "ambient-click-dot";
+    group.append(ring, dot);
+    layer.append(group);
+    activeGroups.push(group);
+
+    const palette = colors();
+    const particles = coarsePointer.matches || event.pointerType === "touch" ? 4 : 6;
+    for (let index = 0; index < particles; index += 1) {
+      const particle = document.createElement("span");
+      particle.className = "ambient-click-pixel";
+      particle.style.background = palette[index % Math.max(1, palette.length)] || "currentColor";
+      const angle = (index / particles) * Math.PI * 2 + 0.18;
+      const distance = 14 + (index % 3) * 4;
+      group.append(particle);
+      particle.animate(
+        [
+          { opacity: 0.55, transform: "translate(-50%, -50%) translate(0, 0) scale(1)" },
+          { opacity: 0, transform: `translate(-50%, -50%) translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px) scale(.65)` },
+        ],
+        { duration: 410, easing: "cubic-bezier(.18,.62,.28,1)" },
+      );
+    }
+
+    const animations = [
+      ring.animate(
+        [
+          { opacity: 0.5, transform: "translate(-50%, -50%) scale(.35)" },
+          { opacity: 0, transform: "translate(-50%, -50%) scale(1)" },
+        ],
+        { duration: 410, easing: "ease-out" },
+      ),
+      dot.animate(
+        [
+          { opacity: 0.68, transform: "translate(-50%, -50%) scale(1)" },
+          { opacity: 0, transform: "translate(-50%, -50%) scale(.25)" },
+        ],
+        { duration: 350, easing: "ease-out" },
+      ),
+    ];
+    Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
+      group.remove();
+      const activeIndex = activeGroups.indexOf(group);
+      if (activeIndex >= 0) activeGroups.splice(activeIndex, 1);
+    });
+  }
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!(event.target instanceof Element)) return;
+    if (boundedRipple(event, event.target)) return;
+    ambientEffect(event, event.target);
+  }, { passive: true });
+</script>

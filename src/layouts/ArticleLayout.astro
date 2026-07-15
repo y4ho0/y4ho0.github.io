@@ -1,0 +1,121 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+import "katex/dist/katex.min.css";
+import Breadcrumbs from "../components/Breadcrumbs.astro";
+import RelatedContent from "../components/RelatedContent.astro";
+import TableOfContents from "../components/TableOfContents.astro";
+import type { AnyContentEntry } from "../lib/content-routing";
+import { collectionLabel } from "../lib/content-routing";
+
+interface Props {
+  entry: AnyContentEntry;
+  breadcrumbs: { label: string; href?: string }[];
+  related?: AnyContentEntry[];
+  headings?: { depth: number; slug: string; text: string }[];
+}
+
+const { entry, breadcrumbs, related = [], headings = [] } = Astro.props;
+const publishedAt = entry.data.publishedAt;
+---
+
+<BaseLayout title={entry.data.title} description={entry.data.description} canonicalPath={Astro.url.pathname} type="article" publishedAt={publishedAt} updatedAt={entry.data.updatedAt}>
+  <div class="reading-progress" aria-hidden="true"><span></span></div>
+  <article class="article-shell">
+    <span data-filter-value={collectionLabel(entry.collection)} data-pagefind-filter="type[data-filter-value]" data-pagefind-ignore></span>
+    {entry.data.tags.map((tag) => <span data-filter-value={tag} data-pagefind-filter="tag[data-filter-value]" data-pagefind-ignore></span>)}
+    {"course" in entry.data && entry.data.course && <span data-filter-value={entry.data.course.id} data-pagefind-filter="course[data-filter-value]" data-pagefind-ignore></span>}
+    <Breadcrumbs items={breadcrumbs} />
+    <header class="article-header">
+      <p class="eyebrow">{entry.collection.slice(0, -1)}</p>
+      <h1 data-pagefind-meta="title">{entry.data.title}</h1>
+      <p data-pagefind-meta="description">{entry.data.description}</p>
+      <dl class="article-meta">
+        <div><dt>Status</dt><dd>{entry.data.status}</dd></div>
+        {publishedAt && <div><dt>Published</dt><dd><time datetime={publishedAt.toISOString()}>{publishedAt.toLocaleDateString("en-CA")}</time></dd></div>}
+        <div><dt>Updated</dt><dd><time datetime={entry.data.updatedAt.toISOString()}>{entry.data.updatedAt.toLocaleDateString("en-CA")}</time></dd></div>
+      </dl>
+      {entry.data.tags.length > 0 && <ul class="tag-list" aria-label="Tags">{entry.data.tags.map((tag) => <li>{tag}</li>)}</ul>}
+    </header>
+    <div class="article-reading-grid">
+      <div class="prose" data-pagefind-body>
+        <slot />
+      </div>
+      <TableOfContents headings={headings} />
+    </div>
+    <slot name="after" />
+    <RelatedContent entries={related} />
+  </article>
+</BaseLayout>
+
+<script>
+  document.querySelectorAll<HTMLElement>(".prose pre").forEach((block) => {
+    if (block.querySelector(".code-copy")) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "code-copy";
+    button.textContent = "Copy";
+    button.setAttribute("aria-label", "Copy code");
+    button.addEventListener("click", async () => {
+      const code = block.querySelector("code")?.textContent ?? "";
+      try {
+        await navigator.clipboard.writeText(code);
+        button.textContent = "Copied";
+      } catch {
+        button.textContent = "Select to copy";
+      }
+      window.setTimeout(() => (button.textContent = "Copy"), 1800);
+    });
+    block.append(button);
+  });
+
+  const article = document.querySelector<HTMLElement>(".article-shell");
+  const progress = document.querySelector<HTMLElement>(".reading-progress span");
+  const headings = Array.from(document.querySelectorAll<HTMLElement>(".prose :is(h2, h3, h4)[id]"));
+  const tocLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>(".table-of-contents a[href^='#']"));
+  let readingFrame = 0;
+
+  headings.forEach((heading) => {
+    if (heading.querySelector(".heading-anchor")) return;
+    const label = heading.textContent?.trim() || "section";
+    const anchor = document.createElement("a");
+    anchor.className = "heading-anchor";
+    anchor.href = `#${heading.id}`;
+    anchor.textContent = "#";
+    anchor.setAttribute("aria-label", `Link to ${label}`);
+    heading.append(anchor);
+  });
+
+  function updateReadingState() {
+    readingFrame = 0;
+    if (article && progress) {
+      const start = article.offsetTop;
+      const distance = Math.max(1, article.scrollHeight - window.innerHeight);
+      const value = Math.min(1, Math.max(0, (window.scrollY - start) / distance));
+      progress.style.transform = `scaleX(${value})`;
+    }
+
+    if (headings.length > 0 && tocLinks.length > 0) {
+      let current = headings[0].id;
+      for (const heading of headings) {
+        if (heading.getBoundingClientRect().top <= window.innerHeight * 0.32) current = heading.id;
+        else break;
+      }
+      if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2) {
+        current = headings.at(-1)?.id ?? current;
+      }
+      tocLinks.forEach((link) => {
+        const target = decodeURIComponent(link.hash.slice(1));
+        if (target === current) link.setAttribute("aria-current", "location");
+        else link.removeAttribute("aria-current");
+      });
+    }
+  }
+
+  function scheduleReadingUpdate() {
+    if (!readingFrame) readingFrame = window.requestAnimationFrame(updateReadingState);
+  }
+
+  window.addEventListener("scroll", scheduleReadingUpdate, { passive: true });
+  window.addEventListener("resize", scheduleReadingUpdate, { passive: true });
+  updateReadingState();
+</script>

@@ -1,0 +1,13 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import ContentCard from "../../components/ContentCard.astro";
+import { byUpdatedDate, getPublishedEssays } from "../../lib/content";
+const essays = byUpdatedDate(await getPublishedEssays());
+---
+
+<BaseLayout title="Essays" description="Longer-form writing from the garden.">
+  <section class="page-shell site-shell">
+    <header class="page-header"><p class="eyebrow">Essays</p><h1>Longer thoughts</h1><p>Essays are listed here after publication.</p></header>
+    {essays.length > 0 ? <div class="content-grid">{essays.map((entry) => <ContentCard entry={entry} />)}</div> : <p class="empty-state">No public essays yet.</p>}
+  </section>
+</BaseLayout>

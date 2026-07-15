@@ -1,0 +1,78 @@
+name: Build and deploy y4ho0's Garden
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # 16:10 UTC is 00:10 on the next calendar day in Asia/Shanghai.
+    - cron: "10 16 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Use Node.js from .nvmrc
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Check Astro, TypeScript, and content references
+        run: npm run check
+
+      - name: Test daily quote recovery and fallback behavior
+        run: npm test
+
+      - name: Generate or recover the daily quote
+        run: npm run quote:generate
+
+      - name: Build Astro pages
+        run: npm run build:astro
+
+      - name: Build Pagefind index
+        run: npm run build:search
+
+      - name: Verify critical output and internal links
+        run: npm run build:verify
+
+      - name: Configure GitHub Pages
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy artifact
+        id: deployment
+        uses: actions/deploy-pages@v4

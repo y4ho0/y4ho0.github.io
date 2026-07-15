@@ -1,0 +1,22 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="About This Site" description="How this digital garden is structured and maintained.">
+  <article class="page-shell site-shell prose" data-pagefind-body>
+    <span data-filter-value="Site" data-pagefind-filter="type[data-filter-value]" data-pagefind-ignore></span>
+    <header class="page-header"><p class="eyebrow">About This Site</p><h1 data-pagefind-meta="title">A quiet place for public work</h1><p data-pagefind-meta="description">This page describes the site itself.</p></header>
+    <h2>Structure</h2>
+    <p>The garden separates courses, notes, labs, projects, and essays so each kind of material can keep an appropriate shape. Empty sections remain visible as honest empty states.</p>
+    <h2>Content status</h2>
+    <p>Seedling, growing, and evergreen describe editorial maturity only. They are not measures of learning progress or skill.</p>
+    <h2>Technology</h2>
+    <p>The site is statically generated with Astro and TypeScript. Markdown content, native CSS and browser APIs keep pages durable and lightweight.</p>
+    <h2>Daily quote</h2>
+    <p>A build-time process selects and validates one external quote per Asia/Shanghai calendar day. It reuses the currently published state and hides the quote when no safe source is available.</p>
+    <h2>Privacy</h2>
+    <p>The site does not publish personal identity, education, location, contact, résumé, employment, competition, research, internship, or skill-rating information.</p>
+    <h2>Source</h2>
+    <p>The source is available in the <a href="https://github.com/y4ho0/y4ho0.github.io">public GitHub repository</a>.</p>
+  </article>
+</BaseLayout>

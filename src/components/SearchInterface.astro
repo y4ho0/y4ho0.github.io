@@ -1,0 +1,83 @@
+---
+interface Props {
+  autofocus?: boolean;
+}
+
+const { autofocus = false } = Astro.props;
+const id = `garden-search-${Math.random().toString(36).slice(2)}`;
+---
+
+<section class="search-interface" data-pagefind-search>
+  <label for={id}>Search public notes, labs, projects, and essays</label>
+  <input id={id} type="search" inputmode="search" autocomplete="off" placeholder="Start typing…" data-search-input autofocus={autofocus} />
+  <p class="search-status" role="status" aria-live="polite" data-search-status>Search loads only when you use it.</p>
+  <ol class="search-results" data-search-results></ol>
+</section>
+
+<script>
+  interface PagefindData {
+    url: string;
+    excerpt: string;
+    meta: { title?: string; description?: string };
+  }
+
+  interface PagefindResult {
+    data: () => Promise<PagefindData>;
+  }
+
+  interface PagefindModule {
+    search: (query: string) => Promise<{ results: PagefindResult[] }>;
+  }
+
+  let pagefindPromise: Promise<PagefindModule> | null = null;
+  const loadPagefind = () => {
+    if (!pagefindPromise) {
+      const modulePath = "/pagefind/pagefind.js";
+      pagefindPromise = import(/* @vite-ignore */ modulePath) as Promise<PagefindModule>;
+    }
+    return pagefindPromise;
+  };
+
+  document.querySelectorAll<HTMLElement>("[data-pagefind-search]").forEach((root) => {
+    if (root.dataset.searchReady === "true") return;
+    root.dataset.searchReady = "true";
+    const input = root.querySelector<HTMLInputElement>("[data-search-input]");
+    const status = root.querySelector<HTMLElement>("[data-search-status]");
+    const list = root.querySelector<HTMLOListElement>("[data-search-results]");
+    let searchVersion = 0;
+
+    input?.addEventListener("input", async () => {
+      const query = input.value.trim();
+      const version = ++searchVersion;
+      if (!list || !status) return;
+      list.replaceChildren();
+      if (query.length < 2) {
+        status.textContent = "Enter at least two characters.";
+        return;
+      }
+
+      status.textContent = "Searching…";
+      try {
+        const pagefind = await loadPagefind();
+        const response = await pagefind.search(query);
+        const data = await Promise.all(response.results.slice(0, 12).map((result) => result.data()));
+        if (version !== searchVersion) return;
+        for (const item of data) {
+          const row = document.createElement("li");
+          const link = document.createElement("a");
+          const title = document.createElement("strong");
+          const excerpt = document.createElement("span");
+          link.href = item.url;
+          title.textContent = item.meta.title || item.url;
+          excerpt.textContent = item.meta.description || item.excerpt.replace(/<[^>]+>/g, " ");
+          link.append(title, excerpt);
+          row.append(link);
+          list.append(row);
+        }
+        status.textContent = data.length === 0 ? "No public content matched." : `${data.length} result${data.length === 1 ? "" : "s"}.`;
+      } catch {
+        status.textContent = "Search is unavailable in this preview. The published site builds its index after the pages.";
+      }
+    });
+  });
+</script>

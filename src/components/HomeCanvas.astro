@@ -1,0 +1,1030 @@
+<canvas class="home-canvas" aria-hidden="true">Decorative character clouds forming and reforming into objects selected from a library of more than twenty knowledge, science, and computing symbols.</canvas>
+
+<script>
+  const canvas = document.querySelector<HTMLCanvasElement>(".home-canvas");
+  const context = canvas?.getContext("2d", { alpha: true });
+  const hero = canvas?.closest<HTMLElement>(".hero");
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const narrowScreen = window.matchMedia("(max-width: 48rem)");
+  const phoneScreen = window.matchMedia("(max-width: 30rem)");
+  const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
+  const glyphs = [
+    "0", "1", "λ", "π", "∑", "#", "$", "%", "&", "@", "!", "?", "=", "-", "_",
+    ":", ";", "(", ")", "[", "]", "{", "}", "<", ">", "/", "+", "·", "*", "^", "|", "~", "≈",
+  ];
+  let particleCount = 42;
+  const initialDuration = 2350;
+  const holdDuration = 5200;
+  const morphDuration = 3200;
+
+  const shapeKinds = [
+    "atom",
+    "book",
+    "terminal",
+    "flask",
+    "planet",
+    "cube",
+    "binary-tree",
+    "compass",
+    "telescope",
+    "hourglass",
+    "microscope",
+    "satellite",
+    "dna",
+    "chip",
+    "key",
+    "lightbulb",
+    "network",
+    "rocket",
+    "gear",
+    "molecule",
+    "benzene",
+  ] as const;
+
+  type ShapeKind = typeof shapeKinds[number];
+
+  const shapeLabels: Record<ShapeKind, string> = {
+    atom: "ATOM",
+    book: "BOOK",
+    terminal: "TERMINAL",
+    flask: "FLASK",
+    planet: "PLANET",
+    cube: "CUBE",
+    "binary-tree": "BINARY TREE",
+    compass: "COMPASS",
+    telescope: "TELESCOPE",
+    hourglass: "HOURGLASS",
+    microscope: "MICROSCOPE",
+    satellite: "SATELLITE",
+    dna: "DNA",
+    chip: "CHIP",
+    key: "KEY",
+    lightbulb: "LIGHT",
+    network: "NETWORK",
+    rocket: "ROCKET",
+    gear: "GEAR",
+    molecule: "MOLECULE",
+    benzene: "BENZENE",
+  };
+
+  interface ShapePoint {
+    x: number;
+    y: number;
+    role: number;
+  }
+
+  interface CharacterCloud {
+    sequence: ShapeKind[];
+    modelPositions: Array<{ x: number; y: number }>;
+    size: number;
+    delay: number;
+    phase: number;
+    color: number;
+    targets: Record<ShapeKind, ShapePoint[]>;
+    brownianX: number;
+    brownianY: number;
+    brownianVelocityX: number;
+    brownianVelocityY: number;
+    motionUpdatedAt: number;
+  }
+
+  interface ReadingZone {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }
+
+  let frame = 0;
+  let running = false;
+  let width = 0;
+  let height = 0;
+  let deviceScale = 1;
+  let lastPaint = 0;
+  let paintedFrames = 0;
+  let startedAt = performance.now();
+  let pointerStrength = 0;
+  const pointer = { x: 0, y: 0, active: false };
+  let clouds: CharacterCloud[] = [];
+  let readingZones: ReadingZone[] = [];
+
+  function seeded(value: number) {
+    const raw = Math.sin(value * 12.9898 + 78.233) * 43758.5453;
+    return raw - Math.floor(raw);
+  }
+
+  function line(x1: number, y1: number, x2: number, y2: number, count: number, role = 0) {
+    return Array.from({ length: count }, (_, index) => {
+      const progress = count === 1 ? 0 : index / (count - 1);
+      return { x: x1 + (x2 - x1) * progress, y: y1 + (y2 - y1) * progress, role };
+    });
+  }
+
+  function ellipse(
+    centerX: number,
+    centerY: number,
+    radiusX: number,
+    radiusY: number,
+    count: number,
+    rotation = 0,
+    role = 0,
+    start = 0,
+    end = Math.PI * 2,
+  ) {
+    const cosine = Math.cos(rotation);
+    const sine = Math.sin(rotation);
+    return Array.from({ length: count }, (_, index) => {
+      const progress = count === 1 ? 0 : index / (count - 1);
+      const angle = start + (end - start) * progress;
+      const localX = Math.cos(angle) * radiusX;
+      const localY = Math.sin(angle) * radiusY;
+      return {
+        x: centerX + localX * cosine - localY * sine,
+        y: centerY + localX * sine + localY * cosine,
+        role,
+      };
+    });
+  }
+
+  function quadratic(
+    x1: number,
+    y1: number,
+    controlX: number,
+    controlY: number,
+    x2: number,
+    y2: number,
+    count: number,
+    role = 0,
+  ) {
+    return Array.from({ length: count }, (_, index) => {
+      const progress = count === 1 ? 0 : index / (count - 1);
+      const inverse = 1 - progress;
+      return {
+        x: inverse * inverse * x1 + 2 * inverse * progress * controlX + progress * progress * x2,
+        y: inverse * inverse * y1 + 2 * inverse * progress * controlY + progress * progress * y2,
+        role,
+      };
+    });
+  }
+
+  function polyline(points: Array<[number, number]>, density = 7, role = 0) {
+    return points.flatMap((point, index) => {
+      const next = points[index + 1];
+      return next ? line(point[0], point[1], next[0], next[1], density, role) : [];
+    });
+  }
+
+  function shapePoints(kind: ShapeKind): ShapePoint[] {
+    if (kind === "atom") {
+      return [
+        ...ellipse(0, 0, 0.44, 0.15, 30, 0, 0),
+        ...ellipse(0, 0, 0.44, 0.15, 30, Math.PI / 3, 1),
+        ...ellipse(0, 0, 0.44, 0.15, 30, -Math.PI / 3, 1),
+        ...ellipse(0, 0, 0.055, 0.055, 10, 0, 0),
+      ];
+    }
+    if (kind === "book") {
+      return [
+        ...quadratic(0, -0.3, -0.24, -0.43, -0.46, -0.31, 16),
+        ...quadratic(-0.46, -0.31, -0.5, 0.03, -0.42, 0.31, 14),
+        ...quadratic(-0.42, 0.31, -0.2, 0.22, 0, 0.38, 16),
+        ...line(0, -0.3, 0, 0.38, 12, 1),
+        ...quadratic(0, -0.3, 0.24, -0.43, 0.46, -0.31, 16),
+        ...quadratic(0.46, -0.31, 0.5, 0.03, 0.42, 0.31, 14),
+        ...quadratic(0.42, 0.31, 0.2, 0.22, 0, 0.38, 16),
+        ...line(-0.35, -0.11, -0.08, -0.03, 7, 1),
+        ...line(-0.36, 0.06, -0.09, 0.14, 7, 1),
+        ...line(0.35, -0.11, 0.08, -0.03, 7, 1),
+        ...line(0.36, 0.06, 0.09, 0.14, 7, 1),
+      ];
+    }
+    if (kind === "terminal") {
+      return [
+        ...polyline([[-0.46, -0.34], [0.46, -0.34], [0.46, 0.34], [-0.46, 0.34], [-0.46, -0.34]], 10),
+        ...line(-0.46, -0.17, 0.46, -0.17, 13, 1),
+        ...ellipse(-0.35, -0.255, 0.025, 0.025, 7, 0, 1),
+        ...ellipse(-0.27, -0.255, 0.025, 0.025, 7, 0, 1),
+        ...polyline([[-0.27, -0.02], [-0.15, 0.08], [-0.27, 0.18]], 8, 1),
+        ...line(-0.08, 0.18, 0.19, 0.18, 9, 1),
+      ];
+    }
+    if (kind === "flask") {
+      return [
+        ...polyline([[-0.13, -0.42], [0.13, -0.42], [0.13, -0.18], [0.4, 0.28], [0.32, 0.4], [-0.32, 0.4], [-0.4, 0.28], [-0.13, -0.18], [-0.13, -0.42]], 9),
+        ...quadratic(-0.34, 0.13, 0, 0.2, 0.34, 0.13, 17, 1),
+        ...ellipse(-0.18, 0.27, 0.035, 0.035, 7, 0, 1),
+        ...ellipse(0.14, 0.3, 0.05, 0.05, 8, 0, 1),
+      ];
+    }
+    if (kind === "planet") {
+      return [
+        ...ellipse(0, 0, 0.28, 0.28, 34),
+        ...ellipse(0, 0, 0.49, 0.14, 42, -0.2, 1),
+        ...ellipse(0.34, -0.29, 0.055, 0.055, 9, 0, 1),
+        ...ellipse(-0.12, -0.07, 0.055, 0.03, 7, 0.35, 1),
+      ];
+    }
+    if (kind === "cube") {
+      const top: [number, number] = [0, -0.43];
+      const left: [number, number] = [-0.4, -0.2];
+      const middle: [number, number] = [0, 0.03];
+      const right: [number, number] = [0.4, -0.2];
+      const lowerLeft: [number, number] = [-0.4, 0.23];
+      const bottom: [number, number] = [0, 0.46];
+      const lowerRight: [number, number] = [0.4, 0.23];
+      return [
+        ...polyline([top, left, middle, right, top], 10),
+        ...polyline([left, lowerLeft, bottom, middle, left], 10, 1),
+        ...polyline([middle, bottom, lowerRight, right, middle], 10),
+      ];
+    }
+    if (kind === "binary-tree") {
+      const nodes: Array<[number, number]> = [[0, -0.38], [-0.25, -0.08], [0.25, -0.08], [-0.4, 0.26], [-0.1, 0.26], [0.1, 0.26], [0.4, 0.26]];
+      const connections: Array<[number, number]> = [[0, 1], [0, 2], [1, 3], [1, 4], [2, 5], [2, 6]];
+      return [
+        ...nodes.flatMap(([x, y], index) => ellipse(x, y, index === 0 ? 0.07 : 0.055, index === 0 ? 0.07 : 0.055, 9, 0, index % 2)),
+        ...connections.flatMap(([from, to], index) => line(nodes[from][0], nodes[from][1], nodes[to][0], nodes[to][1], 8, index % 2)),
+      ];
+    }
+    if (kind === "compass") {
+      return [
+        ...ellipse(0, 0, 0.42, 0.42, 42),
+        ...polyline([[0, -0.34], [0.11, 0.08], [0, 0.34], [-0.11, -0.08], [0, -0.34]], 10, 1),
+        ...ellipse(0, 0, 0.045, 0.045, 8, 0, 1),
+      ];
+    }
+    if (kind === "telescope") {
+      return [
+        ...polyline([[-0.45, -0.18], [0.22, -0.35], [0.32, -0.27], [-0.35, -0.09], [-0.45, -0.18]], 10),
+        ...polyline([[-0.35, -0.09], [0.32, -0.27], [0.36, -0.04], [-0.28, 0.12], [-0.35, -0.09]], 10, 1),
+        ...ellipse(0.34, -0.155, 0.075, 0.145, 22, -0.22, 2),
+        ...ellipse(0.34, -0.155, 0.035, 0.09, 15, -0.22, 1),
+        ...polyline([[-0.52, -0.14], [-0.45, -0.18], [-0.35, -0.09], [-0.43, -0.03], [-0.52, -0.14]], 7, 2),
+        ...polyline([[-0.05, 0.07], [0.08, 0.04], [0.11, 0.17], [-0.02, 0.2], [-0.05, 0.07]], 7, 1),
+        ...line(0.045, 0.18, -0.29, 0.46, 12),
+        ...line(0.045, 0.18, 0.34, 0.46, 12, 1),
+        ...line(0.045, 0.18, 0.02, 0.47, 10, 2),
+      ];
+    }
+    if (kind === "hourglass") {
+      return [
+        ...line(-0.36, -0.4, 0.36, -0.4, 15),
+        ...line(-0.36, 0.4, 0.36, 0.4, 15),
+        ...quadratic(-0.3, -0.34, -0.28, 0, 0.3, 0.34, 20),
+        ...quadratic(0.3, -0.34, 0.28, 0, -0.3, 0.34, 20),
+        ...polyline([[-0.18, -0.26], [0, -0.03], [0.18, -0.26]], 8, 1),
+        ...polyline([[-0.2, 0.3], [0, 0.06], [0.2, 0.3]], 8, 1),
+      ];
+    }
+    if (kind === "microscope") {
+      return [
+        ...polyline([[-0.23, -0.42], [0.04, -0.42], [0.04, -0.3], [-0.18, -0.3], [-0.23, -0.42]], 8),
+        ...quadratic(-0.09, -0.28, 0.32, -0.12, 0.16, 0.2, 22),
+        ...line(-0.22, 0.08, 0.16, 0.08, 12, 1),
+        ...line(-0.04, 0.08, -0.04, 0.25, 7, 1),
+        ...quadratic(-0.04, 0.25, -0.23, 0.32, -0.36, 0.38, 10),
+        ...line(-0.36, 0.38, 0.34, 0.38, 15),
+      ];
+    }
+    if (kind === "satellite") {
+      return [
+        ...polyline([[-0.16, -0.17], [0.1, -0.23], [0.22, -0.08], [-0.05, -0.02], [-0.16, -0.17]], 8),
+        ...polyline([[-0.05, -0.02], [0.22, -0.08], [0.21, 0.17], [-0.06, 0.24], [-0.05, -0.02]], 8, 1),
+        ...polyline([[-0.16, -0.17], [-0.05, -0.02], [-0.06, 0.24], [-0.17, 0.08], [-0.16, -0.17]], 7, 2),
+        ...polyline([[-0.52, -0.25], [-0.23, -0.19], [-0.24, 0.18], [-0.53, 0.12], [-0.52, -0.25]], 9, 1),
+        ...line(-0.43, -0.23, -0.44, 0.14, 7, 2),
+        ...line(-0.33, -0.21, -0.34, 0.16, 7, 2),
+        ...polyline([[0.5, -0.25], [0.27, -0.14], [0.28, 0.2], [0.51, 0.09], [0.5, -0.25]], 9, 1),
+        ...line(0.35, -0.18, 0.36, 0.16, 7, 2),
+        ...line(0.43, -0.22, 0.44, 0.12, 7, 2),
+        ...line(0.04, -0.21, 0.02, -0.38, 7),
+        ...quadratic(-0.16, -0.43, 0.02, -0.28, 0.2, -0.43, 12, 2),
+      ];
+    }
+    if (kind === "dna") {
+      const strandLength = 42;
+      const strandA = Array.from({ length: strandLength }, (_, index) => {
+        const progress = index / (strandLength - 1);
+        const angle = 0.55 + progress * Math.PI * 3.2;
+        return {
+          x: Math.sin(angle) * 0.23,
+          y: -0.46 + progress * 0.92,
+          role: Math.cos(angle) > 0 ? 0 : 2,
+        };
+      });
+      const strandB = Array.from({ length: strandLength }, (_, index) => {
+        const progress = index / (strandLength - 1);
+        const angle = 0.55 + progress * Math.PI * 3.2 + Math.PI;
+        return {
+          x: Math.sin(angle) * 0.23,
+          y: -0.46 + progress * 0.92,
+          role: Math.cos(angle) > 0 ? 1 : 2,
+        };
+      });
+      const rungs = Array.from({ length: 10 }, (_, index) => {
+        const pointIndex = 2 + index * 4;
+        const first = strandA[pointIndex];
+        const second = strandB[pointIndex];
+        return line(first.x, first.y, second.x, second.y, 7, index % 2);
+      }).flat();
+      return [...strandA, ...strandB, ...rungs];
+    }
+    if (kind === "chip") {
+      const pins = [-0.3, -0.1, 0.1, 0.3].flatMap((offset, index) => [
+        ...line(offset, -0.48, offset, -0.34, 5, index % 2),
+        ...line(offset, 0.34, offset, 0.48, 5, index % 2),
+        ...line(-0.48, offset, -0.34, offset, 5, index % 2),
+        ...line(0.34, offset, 0.48, offset, 5, index % 2),
+      ]);
+      return [
+        ...polyline([[-0.34, -0.34], [0.34, -0.34], [0.34, 0.34], [-0.34, 0.34], [-0.34, -0.34]], 11),
+        ...polyline([[-0.18, -0.18], [0.18, -0.18], [0.18, 0.18], [-0.18, 0.18], [-0.18, -0.18]], 7, 1),
+        ...pins,
+      ];
+    }
+    if (kind === "key") {
+      return [
+        ...ellipse(-0.25, -0.12, 0.2, 0.2, 28),
+        ...ellipse(-0.25, -0.12, 0.075, 0.075, 12, 0, 1),
+        ...line(-0.08, 0.02, 0.4, 0.38, 20),
+        ...polyline([[0.18, 0.21], [0.29, 0.08], [0.37, 0.14]], 7, 1),
+        ...polyline([[0.29, 0.3], [0.4, 0.19], [0.46, 0.25]], 7, 1),
+      ];
+    }
+    if (kind === "lightbulb") {
+      return [
+        ...ellipse(0, -0.1, 0.31, 0.33, 34),
+        ...quadratic(-0.18, 0.12, -0.12, 0.23, -0.12, 0.29, 8, 1),
+        ...quadratic(0.18, 0.12, 0.12, 0.23, 0.12, 0.29, 8, 1),
+        ...line(-0.12, 0.29, 0.12, 0.29, 8),
+        ...line(-0.11, 0.36, 0.11, 0.36, 8),
+        ...line(-0.07, 0.43, 0.07, 0.43, 6),
+      ];
+    }
+    if (kind === "molecule") {
+      const atoms: Array<[number, number, number, number]> = [
+        [0, 0, 0.11, 0],
+        [0, -0.42, 0.085, 1],
+        [-0.4, 0.19, 0.09, 2],
+        [0.4, 0.19, 0.09, 1],
+        [0.05, 0.43, 0.08, 2],
+      ];
+      return [
+        ...line(0, -0.06, 0, -0.34, 11),
+        ...line(-0.06, 0.03, -0.33, 0.16, 11, 2),
+        ...line(0.06, 0.03, 0.33, 0.16, 11, 1),
+        ...polyline([[-0.035, 0.08], [0.05, 0.36], [0.035, 0.08]], 10, 2),
+        ...atoms.flatMap(([x, y, radius, role]) => ellipse(x, y, radius, radius, 15, 0, role)),
+      ];
+    }
+    if (kind === "benzene") {
+      const ring: Array<[number, number]> = [
+        [0, -0.42],
+        [0.36, -0.21],
+        [0.36, 0.21],
+        [0, 0.42],
+        [-0.36, 0.21],
+        [-0.36, -0.21],
+      ];
+      const inner = ring.map(([x, y]) => [x * 0.72, y * 0.72] as [number, number]);
+      return [
+        ...polyline([...ring, ring[0]], 10),
+        ...line(inner[0][0], inner[0][1], inner[1][0], inner[1][1], 9, 1),
+        ...line(inner[2][0], inner[2][1], inner[3][0], inner[3][1], 9, 1),
+        ...line(inner[4][0], inner[4][1], inner[5][0], inner[5][1], 9, 1),
+        ...ring.flatMap(([x, y], index) => {
+          const length = Math.hypot(x, y);
+          return line(x, y, x + (x / length) * 0.11, y + (y / length) * 0.11, 5, index % 2);
+        }),
+      ];
+    }
+    if (kind === "network") {
+      const nodes: Array<[number, number]> = [[0, 0], [-0.38, -0.25], [0.38, -0.25], [-0.33, 0.32], [0.34, 0.34], [0, -0.43]];
+      return [
+        ...nodes.slice(1).flatMap(([x, y], index) => line(0, 0, x, y, 9, index % 2)),
+        ...nodes.flatMap(([x, y], index) => ellipse(x, y, index === 0 ? 0.075 : 0.055, index === 0 ? 0.075 : 0.055, 9, 0, index % 2)),
+      ];
+    }
+    if (kind === "rocket") {
+      return [
+        ...quadratic(0, -0.46, -0.3, -0.18, -0.2, 0.25, 18),
+        ...quadratic(0, -0.46, 0.3, -0.18, 0.2, 0.25, 18),
+        ...line(-0.2, 0.25, 0.2, 0.25, 10),
+        ...ellipse(0, -0.12, 0.075, 0.075, 12, 0, 1),
+        ...polyline([[-0.2, 0.12], [-0.39, 0.31], [-0.18, 0.28]], 8, 1),
+        ...polyline([[0.2, 0.12], [0.39, 0.31], [0.18, 0.28]], 8, 1),
+        ...polyline([[-0.11, 0.27], [0, 0.46], [0.11, 0.27]], 9),
+      ];
+    }
+    const gearOutline = Array.from({ length: 40 }, (_, index) => {
+      const angle = (index / 40) * Math.PI * 2;
+      const radius = index % 4 < 2 ? 0.42 : 0.34;
+      return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, role: index % 2 };
+    });
+    return [
+      ...gearOutline,
+      ...ellipse(0, 0, 0.17, 0.17, 20, 0, 1),
+      ...ellipse(0, 0, 0.31, 0.31, 28),
+    ];
+  }
+
+  function normalizedTargets(kind: ShapeKind) {
+    const points = shapePoints(kind);
+    const shapeScale = kind === "dna" ? 1.22 : 1;
+    return Array.from({ length: particleCount }, (_, index) => {
+      const source = points[Math.floor((index / particleCount) * points.length) % points.length];
+      const jitter = (seeded(index * 17 + kind.length * 31) - 0.5) * 0.012;
+      return { x: source.x * shapeScale + jitter, y: source.y * shapeScale - jitter, role: source.role };
+    });
+  }
+
+  function buildTargetRecord() {
+    return Object.fromEntries(shapeKinds.map((kind) => [kind, normalizedTargets(kind)])) as Record<ShapeKind, ShapePoint[]>;
+  }
+
+  function randomBetween(minimum: number, maximum: number) {
+    return minimum + Math.random() * (maximum - minimum);
+  }
+
+  function randomNormal() {
+    const first = Math.max(Number.EPSILON, Math.random());
+    const second = Math.random();
+    return Math.sqrt(-2 * Math.log(first)) * Math.cos(Math.PI * 2 * second);
+  }
+
+  function shuffled<T>(items: readonly T[]) {
+    const result = [...items];
+    for (let index = result.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+    }
+    return result;
+  }
+
+  function shapeRounds(entityCount: number, roundCount = 12) {
+    const firstRound = shuffled(shapeKinds).slice(0, entityCount);
+    const rounds: ShapeKind[][] = [firstRound];
+    while (rounds.length < roundCount) {
+      const previous = rounds[rounds.length - 1];
+      const isFinal = rounds.length === roundCount - 1;
+      const candidates = shapeKinds.filter((kind) => !previous.includes(kind) && (!isFinal || !firstRound.includes(kind)));
+      rounds.push(shuffled(candidates).slice(0, entityCount));
+    }
+    return rounds;
+  }
+
+  const minimumObjectGap = (96 / 2.54) * 2;
+  const layoutSafetyBuffer = 10;
+
+  function visualRadius(size: number) {
+    // The target drawings stay inside roughly 0.5 × size, while labels sit at
+    // 0.62 × size. The final allowance also absorbs the restrained float and
+    // Brownian drift so the measured 2 cm gap is between visible objects.
+    return size * 0.62 + 14;
+  }
+
+  function collectReadingZones(canvasBounds: DOMRect) {
+    const zones: ReadingZone[] = [];
+    const selectors = [
+      ".daily-quote__sizer",
+      ".daily-quote figcaption",
+      ".hero__intro",
+      ".hero__link",
+    ];
+    selectors.forEach((selector) => {
+      const element = hero?.querySelector<HTMLElement>(selector);
+      if (!element) return;
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        if (!node.textContent?.trim()) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        Array.from(range.getClientRects()).forEach((rect) => {
+          if (rect.width <= 0 || rect.height <= 0) return;
+          zones.push({
+            x: rect.left - canvasBounds.left,
+            y: rect.top - canvasBounds.top,
+            width: rect.width,
+            height: rect.height,
+          });
+        });
+        range.detach();
+      }
+    });
+    return zones;
+  }
+
+  function clearsReadingArea(position: { x: number; y: number }, size: number, compact: boolean) {
+    const radius = visualRadius(size);
+    const horizontalRadius = (compact ? 0.18 : 0.14) + radius / width;
+    const verticalRadius = (compact ? 0.12 : 0.12) + radius / height;
+    const outsideCore = ((position.x - 0.5) / horizontalRadius) ** 2
+      + ((position.y - 0.49) / verticalRadius) ** 2 >= 1;
+    if (!outsideCore) return false;
+
+    const centerX = position.x * width;
+    const centerY = position.y * height;
+    const textPadding = compact ? 4 : 8;
+    const textSafetyBuffer = compact ? 4 : layoutSafetyBuffer;
+    return readingZones.every((zone) => {
+      const nearestX = Math.max(zone.x - textPadding, Math.min(centerX, zone.x + zone.width + textPadding));
+      const nearestY = Math.max(zone.y - textPadding, Math.min(centerY, zone.y + zone.height + textPadding));
+      return Math.hypot(centerX - nearestX, centerY - nearestY) >= radius + textSafetyBuffer;
+    });
+  }
+
+  function layoutHasClearance(positions: Array<{ x: number; y: number }>, sizes: number[], compact: boolean) {
+    if (positions.some((position, index) => !clearsReadingArea(position, sizes[index], compact))) return false;
+    for (let first = 0; first < positions.length; first += 1) {
+      for (let second = first + 1; second < positions.length; second += 1) {
+        const distance = Math.hypot(
+          (positions[first].x - positions[second].x) * width,
+          (positions[first].y - positions[second].y) * height,
+        );
+        const required = visualRadius(sizes[first]) + visualRadius(sizes[second])
+          + minimumObjectGap + layoutSafetyBuffer;
+        if (distance < required) return false;
+      }
+    }
+    return true;
+  }
+
+  function scatteredPositions(sizes: number[], compact: boolean) {
+    const count = sizes.length;
+    const placementOrder = sizes
+      .map((size, index) => ({ size, index }))
+      .sort((first, second) => second.size - first.size);
+    let fullestLayout: Array<{ x: number; y: number } | undefined> = [];
+
+    // Restart the whole Poisson-style placement when a late object gets boxed
+    // in. This avoids silently returning fewer entities from an unlucky run.
+    for (let restart = 0; restart < 180; restart += 1) {
+      const placed: Array<{ x: number; y: number } | undefined> = Array(count);
+      for (const item of placementOrder) {
+        const radius = visualRadius(item.size);
+        const xMargin = Math.min(0.28, (radius + 10) / width);
+        const yMargin = Math.min(0.28, (radius + 10) / height);
+        for (let attempt = 0; attempt < 220; attempt += 1) {
+          const candidate = {
+            x: randomBetween(xMargin, 1 - xMargin),
+            y: randomBetween(yMargin, 1 - yMargin),
+          };
+          const candidatePositions: Array<{ x: number; y: number }> = [];
+          const candidateSizes: number[] = [];
+          placed.forEach((position, index) => {
+            if (!position) return;
+            candidatePositions.push(position);
+            candidateSizes.push(sizes[index]);
+          });
+          candidatePositions.push(candidate);
+          candidateSizes.push(item.size);
+          if (!layoutHasClearance(candidatePositions, candidateSizes, compact)) continue;
+          placed[item.index] = candidate;
+          break;
+        }
+        if (!placed[item.index]) break;
+      }
+
+      const placedCount = placed.filter(Boolean).length;
+      if (placedCount > fullestLayout.filter(Boolean).length) fullestLayout = placed;
+      if (placedCount === count) return placed as Array<{ x: number; y: number }>;
+    }
+
+    const maximumRadius = Math.max(...sizes.map(visualRadius));
+    const ringRadiusX = Math.max(0.2, 0.5 - (maximumRadius + 12) / width);
+    const ringRadiusY = Math.max(0.24, 0.49 - (maximumRadius + 12) / height);
+    for (let attempt = 0; attempt < 240; attempt += 1) {
+      const phase = Math.random() * Math.PI * 2;
+      const ring = sizes.map((_, index) => {
+        const angle = phase + (index / count) * Math.PI * 2 + randomBetween(-0.07, 0.07);
+        return {
+          x: 0.5 + Math.cos(angle) * ringRadiusX,
+          y: 0.49 + Math.sin(angle) * ringRadiusY,
+        };
+      });
+      if (layoutHasClearance(ring, sizes, compact)) return ring;
+    }
+
+    return fullestLayout.filter((position): position is { x: number; y: number } => Boolean(position));
+  }
+
+  function transitionHasClearance(
+    from: Array<{ x: number; y: number }>,
+    to: Array<{ x: number; y: number }>,
+    sizes: number[],
+    compact: boolean,
+  ) {
+    for (let step = 1; step < 64; step += 1) {
+      const progress = step / 64;
+      const positions = from.map((position, index) => interpolateModelPosition(position, to[index], progress));
+      if (!layoutHasClearance(positions, sizes, compact)) return false;
+    }
+    return true;
+  }
+
+  function modelPositionRounds(sizes: number[], roundCount: number, compact: boolean) {
+    const entityCount = sizes.length;
+    const layoutPool: Array<Array<{ x: number; y: number }>> = [];
+    const desiredPoolSize = entityCount >= 5 ? 28 : entityCount === 4 ? 14 : 12;
+    const maximumPoolAttempts = entityCount >= 5 ? 90 : entityCount === 4 ? 50 : 40;
+    for (let attempt = 0; attempt < maximumPoolAttempts && layoutPool.length < desiredPoolSize; attempt += 1) {
+      const layout = scatteredPositions(sizes, compact);
+      if (layout.length !== entityCount) continue;
+      const signature = layout
+        .map((position) => `${Math.round(position.x * 12)},${Math.round(position.y * 12)}`)
+        .sort()
+        .join(";");
+      const duplicate = layoutPool.some((existing) => existing
+        .map((position) => `${Math.round(position.x * 12)},${Math.round(position.y * 12)}`)
+        .sort()
+        .join(";") === signature);
+      if (!duplicate) layoutPool.push(layout);
+    }
+
+    const initial = layoutPool.shift() ?? scatteredPositions(sizes, compact);
+    const rounds: Array<Array<{ x: number; y: number }>> = [initial];
+    const minimumTravel = compact ? 0.24 : 0.3;
+
+    while (rounds.length < roundCount) {
+      const previous = rounds[rounds.length - 1];
+      const first = rounds[0];
+      const isFinal = rounds.length === roundCount - 1;
+      let selected: Array<{ x: number; y: number }> = [];
+      let bestMinimumTravel = -1;
+
+      for (const pooledLayout of shuffled(layoutPool)) {
+        for (let variant = 0; variant < 3; variant += 1) {
+          const available = [...pooledLayout];
+          const candidateRound = previous.map((position, index) => {
+            let bestIndex = 0;
+            let bestScore = -1;
+            available.forEach((candidate, candidateIndex) => {
+              const previousDistance = Math.hypot(candidate.x - position.x, candidate.y - position.y);
+              const loopDistance = isFinal
+                ? Math.hypot(candidate.x - first[index].x, candidate.y - first[index].y)
+                : previousDistance;
+              const score = Math.min(previousDistance, loopDistance) + Math.random() * 0.15;
+              if (score > bestScore) {
+                bestScore = score;
+                bestIndex = candidateIndex;
+              }
+            });
+            return available.splice(bestIndex, 1)[0];
+          });
+          const smallestTravel = Math.min(...candidateRound.map((position, index) => (
+            Math.hypot(position.x - previous[index].x, position.y - previous[index].y)
+          )));
+          const pathIsSafe = transitionHasClearance(previous, candidateRound, sizes, compact)
+            && (!isFinal || transitionHasClearance(candidateRound, first, sizes, compact));
+          if (!pathIsSafe) continue;
+          if (smallestTravel > bestMinimumTravel) {
+            bestMinimumTravel = smallestTravel;
+            selected = candidateRound;
+          }
+          if (smallestTravel >= minimumTravel) break;
+        }
+        if (bestMinimumTravel >= minimumTravel) break;
+      }
+
+      rounds.push(selected.length === entityCount ? selected : [...previous]);
+    }
+
+    return rounds;
+  }
+
+  function responsiveEntityCount() {
+    if (phoneScreen.matches) return 2;
+    if (narrowScreen.matches) return 3;
+    return height < 620 ? 4 : 5;
+  }
+
+  function makeClouds() {
+    const compact = narrowScreen.matches;
+    const phone = phoneScreen.matches;
+    const entityCount = responsiveEntityCount();
+    particleCount = phone ? 80 : compact ? 86 : 92;
+    const sizes = Array.from({ length: entityCount }, () => (
+      phone
+        ? randomBetween(120, 138)
+        : compact
+          ? randomBetween(124, 146)
+          : randomBetween(136, 166)
+    ));
+    const targets = buildTargetRecord();
+    const rounds = shapeRounds(entityCount);
+    const positionRounds = modelPositionRounds(sizes, rounds.length, compact);
+    const definitions = positionRounds[0].map((_, index) => {
+      return {
+        sequence: rounds.map((round) => round[index]),
+        modelPositions: positionRounds.map((round) => round[index]),
+        size: sizes[index],
+        delay: 0,
+        phase: randomBetween(0, Math.PI * 2),
+        color: index % 3,
+        brownianX: 0,
+        brownianY: 0,
+        brownianVelocityX: 0,
+        brownianVelocityY: 0,
+        motionUpdatedAt: 0,
+      };
+    });
+
+    clouds = definitions.map((definition) => ({ ...definition, targets }));
+    startedAt = performance.now();
+  }
+
+  function resize() {
+    if (!canvas || !context) return;
+    const bounds = canvas.getBoundingClientRect();
+    const nextWidth = Math.max(1, bounds.width);
+    const nextHeight = Math.max(1, bounds.height);
+    const nextDeviceScale = Math.min(window.devicePixelRatio || 1, 1.5);
+    if (
+      Math.abs(nextWidth - width) < 0.5
+      && Math.abs(nextHeight - height) < 0.5
+      && nextDeviceScale === deviceScale
+    ) return;
+    width = nextWidth;
+    height = nextHeight;
+    deviceScale = nextDeviceScale;
+    canvas.width = Math.round(width * deviceScale);
+    canvas.height = Math.round(height * deviceScale);
+    context.setTransform(deviceScale, 0, 0, deviceScale, 0, 0);
+    canvas.dataset.canvasSize = `${Math.round(width)}x${Math.round(height)}@${deviceScale}`;
+    canvas.dataset.canvasMode = "morphing-character-clouds";
+    canvas.dataset.motionMode = "floating+brownian+model-relocation";
+    canvas.dataset.minimumObjectGap = minimumObjectGap.toFixed(2);
+    canvas.dataset.layoutSafetyBuffer = String(layoutSafetyBuffer);
+    readingZones = collectReadingZones(bounds);
+    canvas.dataset.readingZones = String(readingZones.length);
+    canvas.dataset.readingZoneLayout = readingZones
+      .map((zone) => `${zone.x.toFixed(1)},${zone.y.toFixed(1)},${zone.width.toFixed(1)},${zone.height.toFixed(1)}`)
+      .join(";");
+    const layoutStartedAt = performance.now();
+    makeClouds();
+    canvas.dataset.layoutGenerationMs = (performance.now() - layoutStartedAt).toFixed(1);
+    canvas.dataset.availableObjects = shapeKinds.join(",");
+    canvas.dataset.librarySize = String(shapeKinds.length);
+    canvas.dataset.requestedEntityCount = String(responsiveEntityCount());
+    canvas.dataset.entityCount = String(clouds.length);
+    canvas.dataset.objectSizes = clouds.map((cloud) => cloud.size.toFixed(1)).join(",");
+    draw(performance.now());
+  }
+
+  function easeOutCubic(progress: number) {
+    return 1 - (1 - progress) ** 3;
+  }
+
+  function easeInOutCubic(progress: number) {
+    return progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2;
+  }
+
+  function interpolateModelPosition(
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    progress: number,
+  ) {
+    if (progress <= 0) return from;
+    if (progress >= 1) return to;
+    const compact = narrowScreen.matches;
+    const centerX = 0.5;
+    const centerY = 0.49;
+    const radiusX = compact ? 0.37 : 0.32;
+    const radiusY = compact ? 0.3 : 0.28;
+    const fromX = (from.x - centerX) / radiusX;
+    const fromY = (from.y - centerY) / radiusY;
+    const toX = (to.x - centerX) / radiusX;
+    const toY = (to.y - centerY) / radiusY;
+    const fromAngle = Math.atan2(fromY, fromX);
+    const toAngle = Math.atan2(toY, toX);
+    let angleDelta = toAngle - fromAngle;
+    if (angleDelta > Math.PI) angleDelta -= Math.PI * 2;
+    if (angleDelta < -Math.PI) angleDelta += Math.PI * 2;
+    const fromRadius = Math.hypot(fromX, fromY);
+    const toRadius = Math.hypot(toX, toY);
+    const radius = fromRadius + (toRadius - fromRadius) * progress + Math.sin(progress * Math.PI) * 0.18;
+    const angle = fromAngle + angleDelta * progress;
+    return {
+      x: centerX + Math.cos(angle) * radius * radiusX,
+      y: centerY + Math.sin(angle) * radius * radiusY,
+    };
+  }
+
+  function cloudOffset(cloud: CharacterCloud, time: number, anchor: { x: number; y: number }) {
+    if (reducedMotion.matches) return { x: 0, y: 0, angle: 0 };
+    if (cloud.motionUpdatedAt === 0) cloud.motionUpdatedAt = time;
+    const deltaSeconds = Math.min(0.05, Math.max(0, (time - cloud.motionUpdatedAt) / 1000));
+    cloud.motionUpdatedAt = time;
+    if (deltaSeconds > 0) {
+      const damping = Math.exp(-2.4 * deltaSeconds);
+      const noise = 12 * Math.sqrt(deltaSeconds);
+      cloud.brownianVelocityX += (-cloud.brownianX * 1.8 * deltaSeconds) + randomNormal() * noise;
+      cloud.brownianVelocityY += (-cloud.brownianY * 1.8 * deltaSeconds) + randomNormal() * noise;
+      cloud.brownianVelocityX *= damping;
+      cloud.brownianVelocityY *= damping;
+      cloud.brownianX += cloud.brownianVelocityX * deltaSeconds;
+      cloud.brownianY += cloud.brownianVelocityY * deltaSeconds;
+      const distance = Math.hypot(cloud.brownianX, cloud.brownianY);
+      if (distance > 5.5) {
+        const scale = 5.5 / distance;
+        cloud.brownianX *= scale;
+        cloud.brownianY *= scale;
+        cloud.brownianVelocityX *= 0.72;
+        cloud.brownianVelocityY *= 0.72;
+      }
+    }
+    const drift = time * 0.00014 + cloud.phase;
+    let x = Math.sin(drift * 0.83) * 4.5 + cloud.brownianX;
+    let y = Math.cos(drift * 0.61) * 6 + cloud.brownianY;
+    const angle = Math.sin(drift * 0.47 + cloud.phase * 0.3) * 0.018 + (cloud.brownianX - cloud.brownianY) * 0.0012;
+    if (pointerStrength > 0.001) {
+      const centerX = anchor.x * width;
+      const centerY = anchor.y * height;
+      const deltaX = pointer.x - centerX;
+      const deltaY = pointer.y - centerY;
+      const distance = Math.max(1, Math.hypot(deltaX, deltaY));
+      const radius = Math.min(190, Math.max(125, width * 0.16));
+      if (distance < radius) {
+        const force = ((radius - distance) / radius) * 2.4 * pointerStrength;
+        x -= (deltaX / distance) * force;
+        y -= (deltaY / distance) * force;
+      }
+    }
+    return { x, y, angle };
+  }
+
+  function shapeState(cloud: CharacterCloud, elapsed: number) {
+    if (reducedMotion.matches) return { from: cloud.sequence[0], to: cloud.sequence[0], progress: 1, forming: false, morphing: false, fromIndex: 0, toIndex: 0, positionProgress: 0 };
+    if (elapsed < initialDuration) {
+      return { from: cloud.sequence[0], to: cloud.sequence[0], progress: Math.max(0, elapsed / initialDuration), forming: true, morphing: false, fromIndex: 0, toIndex: 0, positionProgress: 0 };
+    }
+    const cycleDuration = holdDuration + morphDuration;
+    const cycleTime = elapsed - initialDuration;
+    const index = Math.floor(cycleTime / cycleDuration) % cloud.sequence.length;
+    const nextIndex = (index + 1) % cloud.sequence.length;
+    const localTime = cycleTime % cycleDuration;
+    const from = cloud.sequence[index];
+    const to = cloud.sequence[nextIndex];
+    const morphing = localTime > holdDuration;
+    const transitionProgress = morphing ? easeInOutCubic((localTime - holdDuration) / morphDuration) : 0;
+    return {
+      from,
+      to: morphing ? to : from,
+      progress: morphing ? transitionProgress : 1,
+      forming: false,
+      morphing,
+      fromIndex: index,
+      toIndex: morphing ? nextIndex : index,
+      positionProgress: transitionProgress,
+    };
+  }
+
+  function draw(time: number) {
+    if (!canvas || !context) return;
+    context.clearRect(0, 0, width, height);
+    pointerStrength += ((pointer.active ? 1 : 0) - pointerStrength) * 0.07;
+    const styles = getComputedStyle(document.documentElement);
+    const colors = [
+      styles.getPropertyValue("--canvas-color-a").trim() || "#71806a",
+      styles.getPropertyValue("--canvas-color-b").trim() || "#6f7f91",
+      styles.getPropertyValue("--canvas-color-c").trim() || "#81758c",
+    ];
+    let formedObjects = 0;
+    const currentObjects: ShapeKind[] = [];
+    const modelPositionSamples: string[] = [];
+
+    clouds.forEach((cloud, cloudIndex) => {
+      const elapsed = reducedMotion.matches ? Number.POSITIVE_INFINITY : time - startedAt - cloud.delay;
+      const state = shapeState(cloud, elapsed);
+      const formationProgress = state.forming ? easeOutCubic(state.progress) : 1;
+      const fromPosition = cloud.modelPositions[state.fromIndex];
+      const toPosition = cloud.modelPositions[state.toIndex];
+      const modelPosition = interpolateModelPosition(fromPosition, toPosition, state.positionProgress);
+      const centerX = modelPosition.x * width;
+      const centerY = modelPosition.y * height;
+      modelPositionSamples.push(`${modelPosition.x.toFixed(3)},${modelPosition.y.toFixed(3)}`);
+      const drift = cloudOffset(cloud, time, modelPosition);
+      const fromTargets = cloud.targets[state.from];
+      const toTargets = cloud.targets[state.to];
+      if (!state.forming) formedObjects += 1;
+      currentObjects.push(state.progress > 0.5 ? state.to : state.from);
+
+      for (let particleIndex = 0; particleIndex < particleCount; particleIndex += 1) {
+        const fromTarget = fromTargets[particleIndex];
+        const toTarget = toTargets[particleIndex];
+        const localX = fromTarget.x + (toTarget.x - fromTarget.x) * state.progress;
+        const localY = fromTarget.y + (toTarget.y - fromTarget.y) * state.progress;
+        const cosine = Math.cos(drift.angle);
+        const sine = Math.sin(drift.angle);
+        const targetX = centerX + (localX * cosine - localY * sine) * cloud.size + drift.x;
+        const targetY = centerY + (localX * sine + localY * cosine) * cloud.size + drift.y;
+        const seed = seeded(particleIndex * 43 + cloudIndex * 101 + 0.7);
+        const angle = seed * Math.PI * 2;
+        const scatterRadius = cloud.size * (0.42 + seeded(particleIndex + cloudIndex * 73) * 0.72);
+        const startX = centerX + Math.cos(angle) * scatterRadius;
+        const startY = centerY + Math.sin(angle) * scatterRadius * 0.76;
+        const x = startX + (targetX - startX) * formationProgress;
+        const y = startY + (targetY - startY) * formationProgress;
+        const cadence = state.forming || state.morphing ? 105 : 1040 + (particleIndex % 6) * 135;
+        const glyphStep = reducedMotion.matches ? 0 : Math.floor(Math.max(0, elapsed) / cadence);
+        const glyph = glyphs[(Math.floor(seed * glyphs.length) + glyphStep) % glyphs.length];
+        const role = state.progress > 0.5 ? toTarget.role : fromTarget.role;
+        const formationAlpha = state.forming ? Math.min(1, state.progress * 6) : 1;
+        const morphDip = state.morphing ? 1 - Math.sin(state.progress * Math.PI) * 0.18 : 1;
+        const breath = reducedMotion.matches ? 0 : Math.sin(time * 0.00032 + seed * 9) * 0.022;
+
+        context.save();
+        context.globalAlpha = ((role ? 0.47 : 0.58) * formationAlpha * morphDip) + breath;
+        context.fillStyle = colors[(cloud.color + role) % colors.length];
+        context.font = `520 ${narrowScreen.matches ? 10.6 : 11.4}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText(glyph, x, y);
+        context.restore();
+      }
+
+      const labelKind = state.progress > 0.5 ? state.to : state.from;
+      const labelVisibility = state.forming
+        ? Math.max(0, (state.progress - 0.72) / 0.28)
+        : state.morphing
+          ? Math.min(1, Math.abs(state.progress - 0.5) * 2.5)
+          : 1;
+      context.save();
+      context.globalAlpha = 0.48 * labelVisibility;
+      context.fillStyle = colors[cloud.color % colors.length];
+      context.font = `650 ${narrowScreen.matches ? 7.8 : 8.8}px ui-sans-serif, system-ui, sans-serif`;
+      context.letterSpacing = narrowScreen.matches ? "0.06em" : "0.08em";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText(shapeLabels[labelKind], centerX + drift.x, centerY + cloud.size * 0.62 + drift.y);
+      context.restore();
+    });
+
+    canvas.dataset.formedObjects = String(formedObjects);
+    canvas.dataset.currentObjects = currentObjects.join(",");
+    paintedFrames += 1;
+    if (paintedFrames % 60 === 0) {
+      canvas.dataset.canvasFrame = String(paintedFrames);
+      canvas.dataset.motionSample = clouds
+        .map((cloud) => `${cloud.brownianX.toFixed(2)},${cloud.brownianY.toFixed(2)}`)
+        .join(";");
+      canvas.dataset.modelPositionSample = modelPositionSamples.join(";");
+    }
+  }
+
+  function animate(time: number) {
+    if (!running) return;
+    if (time - lastPaint >= 30) {
+      draw(time);
+      lastPaint = time;
+    }
+    frame = window.requestAnimationFrame(animate);
+  }
+
+  function stop(state = "paused") {
+    running = false;
+    window.cancelAnimationFrame(frame);
+    if (canvas) canvas.dataset.canvasState = state;
+  }
+
+  function start() {
+    if (running || document.hidden || !context) return;
+    if (reducedMotion.matches) {
+      if (canvas) canvas.dataset.canvasState = "static";
+      draw(performance.now());
+      return;
+    }
+    running = true;
+    if (canvas) canvas.dataset.canvasState = "running";
+    frame = window.requestAnimationFrame(animate);
+  }
+
+  if (canvas && context) {
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+    document.addEventListener("visibilitychange", () => document.hidden ? stop() : start());
+    reducedMotion.addEventListener("change", () => {
+      stop(reducedMotion.matches ? "static" : "paused");
+      draw(performance.now());
+      start();
+    });
+    narrowScreen.addEventListener("change", resize);
+    phoneScreen.addEventListener("change", resize);
+    hero?.addEventListener("pointermove", (event) => {
+      if (!finePointer.matches || reducedMotion.matches) return;
+      const bounds = canvas.getBoundingClientRect();
+      pointer.x = event.clientX - bounds.left;
+      pointer.y = event.clientY - bounds.top;
+      pointer.active = true;
+    }, { passive: true });
+    hero?.addEventListener("pointerleave", () => {
+      pointer.active = false;
+    });
+    new MutationObserver(() => draw(performance.now())).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    start();
+  }
+</script>

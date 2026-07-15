@@ -1,0 +1,14 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import ContentCard from "../../components/ContentCard.astro";
+import { byUpdatedDate, getPublishedNotes } from "../../lib/content";
+
+const notes = byUpdatedDate((await getPublishedNotes()).filter((entry) => !entry.data.course));
+---
+
+<BaseLayout title="Garden" description="Standalone notes in the garden.">
+  <section class="page-shell site-shell">
+    <header class="page-header"><p class="eyebrow">Garden</p><h1>Notes in progress</h1><p>Standalone notes appear here when they are ready to be public.</p></header>
+    {notes.length > 0 ? <div class="content-grid">{notes.map((entry) => <ContentCard entry={entry} />)}</div> : <p class="empty-state">No public notes yet.</p>}
+  </section>
+</BaseLayout>

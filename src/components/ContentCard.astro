@@ -1,0 +1,24 @@
+---
+import type { AnyContentEntry } from "../lib/content-routing";
+import { collectionLabel, entryRoute } from "../lib/content-routing";
+
+interface Props {
+  entry: AnyContentEntry;
+}
+
+const { entry } = Astro.props;
+---
+
+<article class="content-card" data-content-card data-content-type={entry.collection}>
+  <div class="content-card__meta">
+    <span>{collectionLabel(entry.collection)}</span>
+    <span>{entry.data.status}</span>
+  </div>
+  <h2><a href={entryRoute(entry)}>{entry.data.title}</a></h2>
+  <p>{entry.data.description}</p>
+  {entry.data.tags.length > 0 && (
+    <ul class="tag-list" aria-label="Tags">
+      {entry.data.tags.map((tag) => <li>{tag}</li>)}
+    </ul>
+  )}
+</article>

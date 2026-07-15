@@ -1,0 +1,17 @@
+---
+import { getEntry, render } from "astro:content";
+import ArticleLayout from "../../../../layouts/ArticleLayout.astro";
+import { getPublishedNotes, resolveRelated } from "../../../../lib/content";
+
+export async function getStaticPaths() {
+  const entries = (await getPublishedNotes()).filter((entry) => entry.data.course);
+  return entries.map((entry) => ({ params: { course: entry.data.course!.id, slug: entry.id }, props: { entry } }));
+}
+const { entry } = Astro.props;
+const course = await getEntry(entry.data.course!);
+if (!course) throw new Error(`Missing course for notes/${entry.id}`);
+const { Content, headings } = await render(entry);
+const related = await resolveRelated(entry);
+---
+
+<ArticleLayout entry={entry} breadcrumbs={[{ label: "Home", href: "/" }, { label: "Courses", href: "/courses/" }, { label: course.data.title, href: `/courses/${course.id}/` }, { label: entry.data.title }]} related={related} headings={headings}><Content /></ArticleLayout>

@@ -1,0 +1,305 @@
+---
+import type { PostLocationFrequency } from "../lib/content";
+
+interface Props {
+  locations?: PostLocationFrequency[];
+}
+
+const { locations = [] } = Astro.props;
+const locatedPostCount = locations.reduce((total, location) => total + location.count, 0);
+const globeLabel = locations.length > 0
+  ? `Interactive rotating globe showing ${locatedPostCount} published entries across ${locations.length} locations`
+  : "Interactive rotating globe ready to show locations from future published entries";
+---
+
+<div
+  class="globe-earth"
+  data-globe-earth
+  data-locations={JSON.stringify(locations)}
+  data-location-count={locations.length}
+  data-located-post-count={locatedPostCount}
+  data-globe-state="loading"
+  data-no-click-effect
+  role="img"
+  aria-label={globeLabel}
+  aria-describedby="globe-earth-description"
+  tabindex="0"
+>
+  <canvas
+    class="globe-earth__canvas"
+    aria-hidden="true"
+    tabindex="-1"
+  ></canvas>
+  <span id="globe-earth-description" class="visually-hidden">
+    Marker size represents how many published entries carry that location. Drag the globe or use the arrow keys to adjust its direction.
+  </span>
+</div>
+
+<script>
+  import createGlobe, { type COBEOptions, type Globe, type Marker } from "cobe";
+
+  type Color = [number, number, number];
+
+  interface GlobePalette {
+    dark: number;
+    baseColor: Color;
+    glowColor: Color;
+    markerColor: Color;
+    mapBrightness: number;
+    mapBaseBrightness: number;
+  }
+
+  interface LocationDatum {
+    region: string;
+    name: string;
+    latitude: number;
+    longitude: number;
+    count: number;
+  }
+
+  const roots = document.querySelectorAll<HTMLElement>("[data-globe-earth]");
+
+  roots.forEach((root) => {
+    if (root.dataset.globeReady === "true") return;
+    const canvasElement = root.querySelector<HTMLCanvasElement>(".globe-earth__canvas");
+    if (!canvasElement) return;
+    const canvas: HTMLCanvasElement = canvasElement;
+    root.dataset.globeReady = "true";
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const locationData = JSON.parse(root.dataset.locations ?? "[]") as LocationDatum[];
+    const maximumCount = Math.max(1, ...locationData.map((location) => location.count));
+    const markers: Marker[] = locationData.map((location) => ({
+      location: [location.latitude, location.longitude],
+      size: 0.025 + Math.sqrt(location.count / maximumCount) * 0.055,
+      id: location.region,
+    }));
+
+    let globe: Globe | null = null;
+    let animationFrame = 0;
+    let size = 1;
+    let phi = 2.62;
+    let theta = 0.16;
+    let autoVelocity = 0.000065;
+    let lastFrameTime = performance.now();
+    let resumeAt = 0;
+    let dragging = false;
+    let pointerId = -1;
+    let previousX = 0;
+    let previousY = 0;
+    let cleanedUp = false;
+
+    function themePalette(): GlobePalette {
+      const dark = document.documentElement.dataset.theme === "dark";
+      return dark
+        ? {
+            dark: 1,
+            baseColor: [0.46, 0.55, 0.52],
+            glowColor: [0.09, 0.13, 0.18],
+            markerColor: [0.75, 0.59, 0.4],
+            mapBrightness: 4.8,
+            mapBaseBrightness: 0.08,
+          }
+        : {
+            dark: 0,
+            baseColor: [0.97, 0.94, 0.86],
+            glowColor: [0.99, 0.97, 0.91],
+            markerColor: [0.58, 0.38, 0.24],
+            mapBrightness: 4.4,
+            mapBaseBrightness: 0.015,
+          };
+    }
+
+    function measure() {
+      const bounds = root.getBoundingClientRect();
+      size = Math.max(1, Math.floor(Math.min(bounds.width, bounds.height || bounds.width)));
+    }
+
+    function render(time: number) {
+      if (!globe || cleanedUp) return;
+      const elapsed = Math.min(40, Math.max(0, time - lastFrameTime));
+      lastFrameTime = time;
+      if (!dragging && !reducedMotion.matches) {
+        const targetVelocity = time >= resumeAt ? 0.000065 : 0;
+        const smoothing = 1 - Math.pow(0.9, elapsed / 16.667);
+        autoVelocity += (targetVelocity - autoVelocity) * smoothing;
+        phi += autoVelocity * elapsed;
+      }
+      const palette = themePalette();
+      globe.update({
+        phi,
+        theta,
+        width: size,
+        height: size,
+        dark: palette.dark,
+        baseColor: palette.baseColor,
+        glowColor: palette.glowColor,
+        markerColor: palette.markerColor,
+        mapBrightness: palette.mapBrightness,
+        mapBaseBrightness: palette.mapBaseBrightness,
+      });
+      root.dataset.globePhi = phi.toFixed(3);
+    }
+
+    function loop(time: number) {
+      if (document.hidden || reducedMotion.matches || cleanedUp) return;
+      render(time);
+      animationFrame = window.requestAnimationFrame(loop);
+    }
+
+    function start() {
+      window.cancelAnimationFrame(animationFrame);
+      if (!globe || document.hidden || cleanedUp) return;
+      lastFrameTime = performance.now();
+      if (reducedMotion.matches) {
+        root.dataset.globeState = "static";
+        render(lastFrameTime);
+        return;
+      }
+      root.dataset.globeState = "running";
+      animationFrame = window.requestAnimationFrame(loop);
+    }
+
+    function initialize() {
+      if (globe || cleanedUp) return;
+      measure();
+      const palette = themePalette();
+      const options: COBEOptions = {
+        width: size,
+        height: size,
+        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+        phi,
+        theta,
+        dark: palette.dark,
+        diffuse: 1.08,
+        mapSamples: size < 220 ? 10000 : 15000,
+        mapBrightness: palette.mapBrightness,
+        mapBaseBrightness: palette.mapBaseBrightness,
+        baseColor: palette.baseColor,
+        markerColor: palette.markerColor,
+        glowColor: palette.glowColor,
+        markers,
+        markerElevation: 0.025,
+        scale: 0.96,
+        opacity: 0.9,
+        offset: [0, 0],
+        context: {
+          alpha: true,
+          antialias: true,
+          premultipliedAlpha: true,
+          powerPreference: "low-power",
+        },
+      };
+      globe = createGlobe(canvas, options);
+      root.dataset.globeState = "ready";
+      start();
+    }
+
+    function pauseAutoRotation(milliseconds = 1700) {
+      resumeAt = performance.now() + milliseconds;
+    }
+
+    function onPointerDown(event: PointerEvent) {
+      if (event.button !== 0) return;
+      dragging = true;
+      pointerId = event.pointerId;
+      previousX = event.clientX;
+      previousY = event.clientY;
+      autoVelocity = 0;
+      pauseAutoRotation();
+      canvas.setPointerCapture(pointerId);
+      root.dataset.globeInteraction = "dragging";
+    }
+
+    function onPointerMove(event: PointerEvent) {
+      if (!dragging || event.pointerId !== pointerId) return;
+      const deltaX = event.clientX - previousX;
+      const deltaY = event.clientY - previousY;
+      previousX = event.clientX;
+      previousY = event.clientY;
+      phi += deltaX * 0.0055;
+      theta = Math.max(-0.62, Math.min(0.62, theta + deltaY * 0.004));
+      if (reducedMotion.matches) render(performance.now());
+    }
+
+    function onPointerEnd(event: PointerEvent) {
+      if (event.pointerId !== pointerId) return;
+      dragging = false;
+      pauseAutoRotation();
+      if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
+      pointerId = -1;
+      root.dataset.globeInteraction = "settling";
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      const directions: Record<string, [number, number]> = {
+        ArrowLeft: [-0.12, 0],
+        ArrowRight: [0.12, 0],
+        ArrowUp: [0, -0.08],
+        ArrowDown: [0, 0.08],
+      };
+      const direction = directions[event.key];
+      if (!direction) return;
+      event.preventDefault();
+      phi += direction[0];
+      theta = Math.max(-0.62, Math.min(0.62, theta + direction[1]));
+      autoVelocity = 0;
+      pauseAutoRotation(1400);
+      render(performance.now());
+    }
+
+    function onVisibilityChange() {
+      if (document.hidden) {
+        window.cancelAnimationFrame(animationFrame);
+        root.dataset.globeState = "paused";
+      } else {
+        start();
+      }
+    }
+
+    function onMotionChange() {
+      start();
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      const previousSize = size;
+      measure();
+      if (!globe) initialize();
+      else if (size !== previousSize) render(performance.now());
+    });
+    const themeObserver = new MutationObserver(() => render(performance.now()));
+
+    function cleanup() {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      window.cancelAnimationFrame(animationFrame);
+      resizeObserver.disconnect();
+      themeObserver.disconnect();
+      reducedMotion.removeEventListener("change", onMotionChange);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", cleanup);
+      document.removeEventListener("astro:before-swap", cleanup);
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerup", onPointerEnd);
+      canvas.removeEventListener("pointercancel", onPointerEnd);
+      root.removeEventListener("keydown", onKeyDown);
+      globe?.destroy();
+      globe = null;
+      root.dataset.globeState = "destroyed";
+    }
+
+    resizeObserver.observe(root);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    reducedMotion.addEventListener("change", onMotionChange);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", cleanup);
+    document.addEventListener("astro:before-swap", cleanup);
+    canvas.addEventListener("pointerdown", onPointerDown);
+    canvas.addEventListener("pointermove", onPointerMove, { passive: true });
+    canvas.addEventListener("pointerup", onPointerEnd);
+    canvas.addEventListener("pointercancel", onPointerEnd);
+    root.addEventListener("keydown", onKeyDown);
+    initialize();
+  });
+</script>

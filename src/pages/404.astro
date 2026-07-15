@@ -1,0 +1,14 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import DuckMark from "../components/DuckMark.astro";
+---
+
+<BaseLayout title="Page not found" description="The requested path does not exist." noindex>
+  <section class="not-found site-shell">
+    <DuckMark size="large" label="A pixel-art white duck reclining on a peach pillow with one wing bent behind its head" />
+    <p class="eyebrow">404</p>
+    <h1>This path has not grown here.</h1>
+    <p>The page may have moved, or it may never have been planted.</p>
+    <a class="button-link" href="/">Return to the garden</a>
+  </section>
+</BaseLayout>

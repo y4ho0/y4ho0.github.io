@@ -1,0 +1,19 @@
+---
+import type { AnyContentEntry } from "../lib/content-routing";
+import ContentCard from "./ContentCard.astro";
+
+interface Props {
+  entries: AnyContentEntry[];
+}
+
+const { entries } = Astro.props;
+---
+
+{entries.length > 0 && (
+  <aside class="related-content" aria-labelledby="related-heading">
+    <h2 id="related-heading">Related</h2>
+    <div class="content-grid content-grid--compact">
+      {entries.map((entry) => <ContentCard entry={entry} />)}
+    </div>
+  </aside>
+)}

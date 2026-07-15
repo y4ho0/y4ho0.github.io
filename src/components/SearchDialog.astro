@@ -1,0 +1,73 @@
+---
+import SearchInterface from "./SearchInterface.astro";
+---
+
+<button class="search-trigger" type="button" aria-haspopup="dialog" aria-controls="search-dialog" aria-expanded="false" data-search-open>
+  <span>Search</span><kbd aria-hidden="true">⌘K</kbd>
+</button>
+<dialog class="search-dialog" id="search-dialog" aria-labelledby="search-dialog-title">
+  <div class="search-dialog__header">
+    <h2 id="search-dialog-title">Search the garden</h2>
+    <button type="button" class="search-dialog__close" aria-label="Close search">Close</button>
+  </div>
+  <SearchInterface />
+  <p class="search-dialog__footer"><a href="/search/">Open the full search page</a></p>
+</dialog>
+
+<script>
+  const dialog = document.querySelector<HTMLDialogElement>("#search-dialog");
+  const openButtons = document.querySelectorAll<HTMLButtonElement>("[data-search-open]");
+  const closeButton = dialog?.querySelector<HTMLButtonElement>(".search-dialog__close");
+  const focusableSelector = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
+  let returnFocus: HTMLElement | null = null;
+
+  function openSearch(trigger?: HTMLElement | null) {
+    if (!dialog || dialog.open) return;
+    const otherDialog = document.querySelector<HTMLDialogElement>("dialog[open]");
+    if (otherDialog && otherDialog !== dialog) return;
+    returnFocus = trigger ?? (document.activeElement as HTMLElement | null);
+    dialog.showModal();
+    openButtons.forEach((button) => button.setAttribute("aria-expanded", "true"));
+    window.requestAnimationFrame(() => dialog.querySelector<HTMLInputElement>("[data-search-input]")?.focus());
+  }
+
+  openButtons.forEach((button) => button.addEventListener("click", () => openSearch(button)));
+  closeButton?.addEventListener("click", () => dialog?.close());
+  dialog?.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+  dialog?.addEventListener("close", () => {
+    openButtons.forEach((button) => button.setAttribute("aria-expanded", "false"));
+    returnFocus?.focus();
+  });
+  dialog?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      dialog.close();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector));
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    const target = event.target as HTMLElement | null;
+    const isTyping = target?.matches("input, textarea, select, [contenteditable='true']");
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      openSearch();
+    } else if (event.key === "/" && !isTyping && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      event.preventDefault();
+      openSearch();
+    }
+  });
+</script>

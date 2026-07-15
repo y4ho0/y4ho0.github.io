@@ -1,0 +1,18 @@
+---
+import { render } from "astro:content";
+import ArticleLayout from "../../layouts/ArticleLayout.astro";
+import { getPublishedLabs, resolveRelated } from "../../lib/content";
+
+export async function getStaticPaths() {
+  const entries = (await getPublishedLabs()).filter((entry) => !entry.data.course);
+  return entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+const related = await resolveRelated(entry);
+---
+
+<ArticleLayout entry={entry} breadcrumbs={[{ label: "Home", href: "/" }, { label: "Labs", href: "/labs/" }, { label: entry.data.title }]} related={related} headings={headings}>
+  <Content />
+</ArticleLayout>

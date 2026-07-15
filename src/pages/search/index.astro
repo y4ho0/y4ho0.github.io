@@ -1,0 +1,11 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SearchInterface from "../../components/SearchInterface.astro";
+---
+
+<BaseLayout title="Search" description="Search the public content in y4ho0's Garden.">
+  <section class="page-shell site-shell" aria-labelledby="search-title">
+    <header class="page-header"><p class="eyebrow">Search</p><h1 id="search-title">Find a path through the garden</h1><p>The index contains only published article content.</p></header>
+    <SearchInterface autofocus />
+  </section>
+</BaseLayout>

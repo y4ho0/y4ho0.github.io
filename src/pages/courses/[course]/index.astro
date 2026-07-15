@@ -1,0 +1,21 @@
+---
+import { render } from "astro:content";
+import ArticleLayout from "../../../layouts/ArticleLayout.astro";
+import ContentCard from "../../../components/ContentCard.astro";
+import { getPublishedCourses, getPublishedLabs, getPublishedNotes, getPublishedProjects } from "../../../lib/content";
+
+export async function getStaticPaths() {
+  const entries = await getPublishedCourses();
+  return entries.map((entry) => ({ params: { course: entry.id }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+const [notes, labs, projects] = await Promise.all([getPublishedNotes(), getPublishedLabs(), getPublishedProjects()]);
+const children = [...notes, ...labs, ...projects].filter((item) => item.data.course?.id === entry.id);
+---
+
+<ArticleLayout entry={entry} breadcrumbs={[{ label: "Home", href: "/" }, { label: "Courses", href: "/courses/" }, { label: entry.data.title }]} headings={headings}>
+  <Content />
+  {children.length > 0 && <section slot="after" class="course-contents"><h2>Contents</h2><div class="content-grid">{children.map((item) => <ContentCard entry={item} />)}</div></section>}
+</ArticleLayout>

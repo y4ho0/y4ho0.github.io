@@ -1,0 +1,42 @@
+---
+import ThemeControl from "./ThemeControl.astro";
+import MobileNav from "./MobileNav.astro";
+import SearchDialog from "./SearchDialog.astro";
+
+const pathname = Astro.url.pathname;
+const links = [
+  ["Garden", "/garden/"],
+  ["Courses", "/courses/"],
+  ["Labs", "/labs/"],
+  ["Essays", "/essays/"],
+  ["Archive", "/archive/"],
+  ["About", "/about/"],
+] as const;
+---
+
+<header class="site-header" data-pagefind-ignore="all">
+  <div class="site-shell site-header__inner">
+    <a class="wordmark" href="/" aria-label="y4ho0's Garden home">y4ho0's Garden</a>
+    <nav class="site-nav" aria-label="Primary navigation">
+      {links.map(([label, href]) => <a href={href} aria-current={pathname.startsWith(href) ? "page" : undefined}>{label}</a>)}
+      <SearchDialog />
+      <ThemeControl />
+    </nav>
+    <MobileNav />
+  </div>
+</header>
+
+<script>
+  const header = document.querySelector<HTMLElement>(".site-header");
+  let scrollFrame = 0;
+
+  function updateHeaderSurface() {
+    header?.classList.toggle("is-scrolled", window.scrollY > 12);
+    scrollFrame = 0;
+  }
+
+  window.addEventListener("scroll", () => {
+    if (!scrollFrame) scrollFrame = window.requestAnimationFrame(updateHeaderSurface);
+  }, { passive: true });
+  updateHeaderSurface();
+</script>

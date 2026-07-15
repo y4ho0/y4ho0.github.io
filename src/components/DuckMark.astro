@@ -1,0 +1,12 @@
+---
+interface Props {
+  label?: string;
+  size?: "small" | "medium" | "large";
+}
+
+const { label, size = "small" } = Astro.props;
+---
+
+<span class:list={["duck-mark", `duck-mark--${size}`]} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : "true"}>
+  <img src="/duck-resting.png" width="512" height="512" alt="" loading="eager" decoding="async" />
+</span>

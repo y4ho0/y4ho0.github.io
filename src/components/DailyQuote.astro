@@ -1,0 +1,156 @@
+---
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
+interface Quote {
+  date: string;
+  text: string;
+  author: string | null;
+  source: string | null;
+  language: "en" | "zh";
+  provider: string | null;
+  providerUrl: string | null;
+  status: "fresh" | "fallback" | "hidden";
+}
+
+let quote: Quote | null = null;
+try {
+  quote = JSON.parse(await readFile(resolve("public/data/daily-quote.json"), "utf8"));
+} catch {
+  quote = null;
+}
+
+const attribution = quote?.author || quote?.source;
+const providerUrl = quote?.providerUrl?.startsWith("https://") ? quote.providerUrl : null;
+const quoteLength = Array.from(quote?.text ?? "").length;
+const shortLimit = quote?.language === "zh" ? 34 : 70;
+const longLimit = quote?.language === "zh" ? 72 : 150;
+const quoteSize = quoteLength <= shortLimit ? "short" : quoteLength > longLimit ? "long" : "medium";
+---
+
+{quote?.text && quote.status !== "hidden" && (
+  <figure
+    class:list={["daily-quote", `daily-quote--${quoteSize}`]}
+    data-quote-language={quote.language}
+    data-quote-size={quoteSize}
+    data-quote-text={quote.text}
+    data-quote-date={quote.date}
+    data-quote-animation="pending"
+    data-pagefind-ignore="all"
+  >
+    <blockquote lang={quote.language} aria-label={quote.text}>
+      <p class="daily-quote__text">
+        <span class="daily-quote__sizer" aria-hidden="true">{quote.text}</span>
+        <span class="daily-quote__typing" aria-hidden="true">
+          <span class="daily-quote__output"></span><span class="daily-quote__cursor"></span>
+        </span>
+      </p>
+    </blockquote>
+    {(attribution || providerUrl) && (
+      <figcaption>
+        {attribution && <span>— {attribution}{quote.author && quote.source ? `, ${quote.source}` : ""}</span>}
+        {providerUrl && <a href={providerUrl} rel="external noreferrer">{quote.provider}</a>}
+      </figcaption>
+    )}
+  </figure>
+)}
+
+<script>
+  const figure = document.querySelector<HTMLElement>(".daily-quote[data-quote-animation]");
+  const output = figure?.querySelector<HTMLElement>(".daily-quote__output");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  function showDirectly() {
+    if (figure) figure.dataset.quoteAnimation = "direct";
+  }
+
+  if (figure && output) {
+    const quoteFigure = figure;
+    const quoteOutput = output;
+    const text = quoteFigure.dataset.quoteText ?? "";
+    const language = quoteFigure.dataset.quoteLanguage ?? "en";
+    const date = quoteFigure.dataset.quoteDate ?? "undated";
+    const storageKey = `garden-quote-seen:${date}`;
+    let seen = false;
+
+    try {
+      seen = sessionStorage.getItem(storageKey) === "1";
+    } catch {
+      seen = false;
+    }
+
+    if (!text || seen || reduceMotion.matches) {
+      showDirectly();
+    } else {
+      try {
+        sessionStorage.setItem(storageKey, "1");
+      } catch {
+        // The animation remains a progressive enhancement when storage is unavailable.
+      }
+
+      quoteFigure.dataset.quoteAnimation = "typing";
+      const characters = Array.from(text);
+      const totalDuration = Math.min(3600, Math.max(1100, 700 + characters.length * 25));
+      const stepDuration = totalDuration / Math.max(1, characters.length);
+      let index = 0;
+      let startedAt = 0;
+      let currentWord: HTMLSpanElement | null = null;
+
+      function appendCharacter(character: string) {
+        if (/\s/u.test(character)) {
+          quoteOutput.append(document.createTextNode(character));
+          currentWord = null;
+          return;
+        }
+
+        const characterElement = document.createElement("span");
+        characterElement.className = "daily-quote__character";
+        characterElement.textContent = character;
+        if (language === "en") {
+          if (!currentWord) {
+            currentWord = document.createElement("span");
+            currentWord.className = "daily-quote__word";
+            quoteOutput.append(currentWord);
+          }
+          currentWord.append(characterElement);
+        } else {
+          quoteOutput.append(characterElement);
+        }
+        characterElement.animate(
+          [
+            { opacity: 0, transform: "translateY(0.12em)" },
+            { opacity: 1, transform: "translateY(0)" },
+          ],
+          { duration: Math.min(180, Math.max(90, stepDuration * 2.4)), easing: "ease-out", fill: "both" },
+        );
+      }
+
+      function typeFrame(time: number) {
+        if (reduceMotion.matches) {
+          quoteOutput.replaceChildren();
+          showDirectly();
+          return;
+        }
+        if (!startedAt) startedAt = time;
+        const target = Math.min(characters.length, Math.floor((time - startedAt) / stepDuration) + 1);
+        while (index < target) {
+          appendCharacter(characters[index]);
+          index += 1;
+        }
+        if (index < characters.length) {
+          requestAnimationFrame(typeFrame);
+        } else {
+          quoteFigure.dataset.quoteAnimation = "complete";
+        }
+      }
+
+      reduceMotion.addEventListener("change", () => {
+        if (reduceMotion.matches) {
+          quoteOutput.replaceChildren();
+          showDirectly();
+        }
+      }, { once: true });
+      requestAnimationFrame(typeFrame);
+    }
+  }
+</script>
