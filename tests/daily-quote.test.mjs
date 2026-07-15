@@ -30,6 +30,24 @@ function baseQuote(overrides = {}) {
   };
 }
 
+function hiddenQuote(overrides = {}) {
+  return {
+    version: 1,
+    date: "2026-07-16",
+    text: "",
+    author: null,
+    source: null,
+    language: "en",
+    category: "english",
+    provider: null,
+    providerUrl: null,
+    fetchedAt: null,
+    status: "hidden",
+    history: [],
+    ...overrides,
+  };
+}
+
 test("uses the Asia/Shanghai calendar date", () => {
   assert.equal(dateInShanghai(new Date("2026-07-14T16:01:00.000Z")), "2026-07-15");
 });
@@ -53,6 +71,38 @@ test("reuses local state on a repeated same-day manual build", async () => {
   });
   assert.deepEqual(quote, current);
   assert.equal(calls, 1);
+});
+
+test("retries a hidden online state later on the same day", async () => {
+  let calls = 0;
+  const quote = await resolveDailyQuote({
+    now,
+    onlineUrl,
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls === 1) return response(hiddenQuote());
+      return response([{ content: "A recovered daily thought.", author: "A. Writer", _id: "recovered" }]);
+    },
+  });
+  assert.equal(quote.status, "fresh");
+  assert.equal(quote.text, "A recovered daily thought.");
+  assert.equal(calls, 2);
+});
+
+test("uses DummyJSON when Quotable is unavailable", async () => {
+  let calls = 0;
+  const quote = await resolveDailyQuote({
+    now,
+    onlineUrl,
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls <= 2) return response({}, calls === 1 ? 404 : 503);
+      return response({ quote: "A dependable fallback thought.", author: "Fallback Author", id: 42 });
+    },
+  });
+  assert.equal(quote.status, "fresh");
+  assert.equal(quote.provider, "DummyJSON Quotes");
+  assert.equal(quote.text, "A dependable fallback thought.");
 });
 
 test("rejects unsafe same-day stored state", async () => {

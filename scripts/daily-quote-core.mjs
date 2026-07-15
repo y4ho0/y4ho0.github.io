@@ -3,7 +3,7 @@ const MAX_HISTORY = 30;
 const MAX_LENGTH = 220;
 
 const providers = {
-  english: [fetchQuotable, fetchZenQuotes],
+  english: [fetchQuotable, fetchDummyJson, fetchZenQuotes],
   chinese: [fetchHitokotoChinese],
   "math-cs": [fetchProgrammingQuote, fetchQuotableTechnical],
   "fiction-games": [fetchHitokotoFiction],
@@ -185,6 +185,7 @@ async function fetchJson(fetchImpl, url, timeoutMs = 2500) {
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetchImpl(url, {
+      cache: "no-store",
       headers: { accept: "application/json", "user-agent": "y4ho0-garden-build/1.0" },
       signal: controller.signal,
     });
@@ -192,6 +193,16 @@ async function fetchJson(fetchImpl, url, timeoutMs = 2500) {
     return await response.json();
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+function cacheBustedStateUrl(url, now) {
+  try {
+    const stateUrl = new URL(url);
+    stateUrl.searchParams.set("quote-state-check", String(now.getTime()));
+    return stateUrl.toString();
+  } catch {
+    return url;
   }
 }
 
@@ -224,6 +235,24 @@ async function fetchZenQuotes(fetchImpl) {
     provider: "ZenQuotes",
     providerUrl: "https://zenquotes.io/",
   };
+}
+
+async function fetchDummyJson(fetchImpl) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const quote = await fetchJson(fetchImpl, "https://dummyjson.com/quotes/random");
+    const text = plainText(quote?.quote);
+    const author = plainText(quote?.author);
+    if (!isSafeText(text) || !author) continue;
+    return {
+      text,
+      author,
+      source: null,
+      language: "en",
+      provider: "DummyJSON Quotes",
+      providerUrl: "https://dummyjson.com/docs/quotes",
+    };
+  }
+  throw new Error("DummyJSON did not return a usable quote.");
 }
 
 async function fetchHitokoto(fetchImpl, query) {
@@ -264,23 +293,29 @@ export async function resolveDailyQuote({
   localQuote = null,
   onlineUrl = ONLINE_QUOTE_URL,
   maxAttempts = 3,
+  onProviderError = null,
 } = {}) {
   const today = dateInShanghai(now);
   let onlineQuote = null;
   try {
-    onlineQuote = await fetchJson(fetchImpl, onlineUrl);
+    onlineQuote = await fetchJson(fetchImpl, cacheBustedStateUrl(onlineUrl, now));
   } catch {
     onlineQuote = null;
   }
 
-  if (isStoredQuote(onlineQuote) && onlineQuote.date === today) return onlineQuote;
-  if (isStoredQuote(localQuote) && localQuote.date === today) return localQuote;
+  const storedOnlineQuote = isStoredQuote(onlineQuote) ? onlineQuote : null;
+  const storedLocalQuote = isStoredQuote(localQuote) ? localQuote : null;
 
-  const previous = isStoredQuote(onlineQuote)
-    ? onlineQuote
-    : isStoredQuote(localQuote)
-      ? localQuote
-      : null;
+  // A hidden state means no quote was actually generated. Retry it later on
+  // the same day, while successful fresh/fallback states remain stable.
+  if (storedOnlineQuote?.date === today && storedOnlineQuote.status !== "hidden") return storedOnlineQuote;
+  if (storedLocalQuote?.date === today && storedLocalQuote.status !== "hidden") return storedLocalQuote;
+
+  const previous = storedOnlineQuote?.text
+    ? storedOnlineQuote
+    : storedLocalQuote?.text
+      ? storedLocalQuote
+      : storedOnlineQuote ?? storedLocalQuote;
   const category = selectCategory(today);
   const categoryProviders = providers[category];
   const recent = new Set(
@@ -304,7 +339,11 @@ export async function resolveDailyQuote({
         status: "fresh",
         history: recentHistory(previous, candidate),
       };
-    } catch {
+    } catch (error) {
+      onProviderError?.({
+        provider: provider.name || "anonymous-provider",
+        error,
+      });
       // A provider failure is expected to fall through to the next adapter.
     }
   }

@@ -15,6 +15,9 @@ async function readLocalQuote() {
 const quote = await resolveDailyQuote({
   localQuote: await readLocalQuote(),
   onlineUrl: process.env.DAILY_QUOTE_ONLINE_URL || undefined,
+  onProviderError: ({ provider }) => {
+    console.warn(`Daily quote provider failed: ${provider}.`);
+  },
 });
 
 await mkdir(resolve("public/data"), { recursive: true });
