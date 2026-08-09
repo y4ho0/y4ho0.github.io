@@ -36,30 +36,29 @@ function courseId(entry: AnyContentEntry) {
       </>
     ) : <p class="empty-state">The archive is empty because no content has been published yet.</p>}
   </section>
-</BaseLayout>
-
-<script>
-  const form = document.querySelector<HTMLFormElement>(".archive-filters");
-  const items = Array.from(document.querySelectorAll<HTMLElement>("[data-archive-grid] > [data-type]"));
-  const empty = document.querySelector<HTMLElement>("[data-filter-empty]");
-  form?.addEventListener("change", () => {
-    const data = new FormData(form);
-    const type = String(data.get("type") ?? "");
-    const status = String(data.get("status") ?? "");
-    const tag = String(data.get("tag") ?? "");
-    const course = String(data.get("course") ?? "");
-    const year = String(data.get("year") ?? "");
-    let visible = 0;
-    items.forEach((item) => {
-      const itemTags = JSON.parse(item.dataset.tags ?? "[]") as string[];
-      const show = (!type || item.dataset.type === type)
-        && (!status || item.dataset.status === status)
-        && (!tag || itemTags.includes(tag))
-        && (!course || item.dataset.course === course)
-        && (!year || item.dataset.year === year);
-      item.hidden = !show;
-      if (show) visible += 1;
+  <script>
+    const form = document.querySelector<HTMLFormElement>(".archive-filters");
+    const items = Array.from(document.querySelectorAll<HTMLElement>("[data-archive-grid] > [data-type]"));
+    const empty = document.querySelector<HTMLElement>("[data-filter-empty]");
+    form?.addEventListener("change", () => {
+      const data = new FormData(form);
+      const type = String(data.get("type") ?? "");
+      const status = String(data.get("status") ?? "");
+      const tag = String(data.get("tag") ?? "");
+      const course = String(data.get("course") ?? "");
+      const year = String(data.get("year") ?? "");
+      let visible = 0;
+      items.forEach((item) => {
+        const itemTags = JSON.parse(item.dataset.tags ?? "[]") as string[];
+        const show = (!type || item.dataset.type === type)
+          && (!status || item.dataset.status === status)
+          && (!tag || itemTags.includes(tag))
+          && (!course || item.dataset.course === course)
+          && (!year || item.dataset.year === year);
+        item.hidden = !show;
+        if (show) visible += 1;
+      });
+      if (empty) empty.hidden = visible !== 0;
     });
-    if (empty) empty.hidden = visible !== 0;
-  });
-</script>
+  </script>
+</BaseLayout>
