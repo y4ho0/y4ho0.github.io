@@ -1,0 +1,12 @@
+/* Ease the palette itself so links, controls and writing stay interactive.
+   The script enables this only after first paint; preview documents follow
+   their parent's color-scheme without scripts or rebuilding their contents. */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme-transition="colors"],
+  :root[data-theme-transition="colors"] :where(body, body *, body *::before, body *::after),
+  :root[data-theme-preview] :where(body, body *, body *::before, body *::after) {
+    transition-property: color, background-color, border-color, box-shadow, fill, stroke !important;
+    transition-duration: 720ms !important;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+}

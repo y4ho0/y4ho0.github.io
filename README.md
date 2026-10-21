@@ -63,7 +63,7 @@ The public site avoids personal identity, education, residence, contact, résum�
 
 ## Interface language
 
-Public pages default to Simplified Chinese. Use the **中文 / EN** control in the desktop header or mobile menu to switch to English; the preference is saved as `garden-language` in localStorage and applies across pages. Theme controls use monitor / sun / moon icons with translated tooltips and accessible names.
+Public pages default to Simplified Chinese. Use the **中文 / EN** control in the desktop header or mobile menu to switch to English; the preference is saved as `garden-language` in localStorage and applies across pages. The Yahoo wordmark and navigation align to the left; search uses a magnifying-glass icon and retains its keyboard shortcuts. 中文 / EN buttons have equal sizes, and the footer uses LXGW WenKai Screen. Theme controls use monitor / sun / moon icons with translated tooltips and accessible names. Palette changes ease over 720ms with a cubic-bezier curve while controls remain interactive; reduced-motion preferences switch immediately.
 
 Language switching updates interface labels, page titles, descriptions, search messages, and date formatting without reloading the page. Article titles, summaries, Markdown, tags, place names, daily quotes, and friend profiles remain in their original language. URLs, content schemas, RSS and sitemap routes are unchanged. The management interface at `/admin/` continues to use Chinese.
 

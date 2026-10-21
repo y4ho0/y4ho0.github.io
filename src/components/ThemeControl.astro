@@ -1,5 +1,6 @@
 ---
 import { uiAttrs } from "../lib/ui-language";
+import "../styles/theme-motion.css";
 
 interface Props { labels?: { system: string; light: string; dark: string }; label?: string; localized?: boolean }
 const { labels = { system: "System", light: "Light", dark: "Dark" }, label = "Color theme", localized = false } = Astro.props;
@@ -28,7 +29,9 @@ const buttonAttrs = (value: "system" | "light" | "dark") => localized
   const storageKey = "garden-theme";
   const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-theme-value]"));
   const media = window.matchMedia("(prefers-color-scheme: dark)");
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   let currentPreference = "system";
+  let cleanupTimer: number | undefined;
 
   function readPreference() {
     try {
@@ -37,13 +40,24 @@ const buttonAttrs = (value: "system" | "light" | "dark") => localized
     } catch { return currentPreference; }
   }
 
-  function applyTheme(preference: string) {
+  function applyTheme(preference: string, animate = false) {
     currentPreference = preference;
+    const root = document.documentElement;
     const resolved = preference === "system" ? (media.matches ? "dark" : "light") : preference;
-    document.documentElement.dataset.theme = resolved;
-    document.documentElement.dataset.themePreference = preference;
-    document
-      .querySelector('meta[name="theme-color"]')
+    if (!animate || reducedMotion.matches) {
+      window.clearTimeout(cleanupTimer);
+      delete root.dataset.themeTransition;
+    } else if (root.dataset.theme !== resolved) {
+      window.clearTimeout(cleanupTimer);
+      root.dataset.themeTransition = "colors";
+      // Establish the pre-change colors before updating the palette. Only color
+      // properties ease: controls, selection and writing remain interactive.
+      getComputedStyle(document.body).backgroundColor;
+      cleanupTimer = window.setTimeout(() => { delete root.dataset.themeTransition; }, 800);
+    }
+    root.dataset.theme = resolved;
+    root.dataset.themePreference = preference;
+    document.querySelector('meta[name="theme-color"]')
       ?.setAttribute("content", resolved === "dark" ? "#10151c" : "#f4f0e6");
     buttons.forEach((button) => {
       button.setAttribute("aria-pressed", String(button.dataset.themeValue === preference));
@@ -54,14 +68,15 @@ const buttonAttrs = (value: "system" | "light" | "dark") => localized
     button.addEventListener("click", () => {
       const preference = button.dataset.themeValue ?? "system";
       try { localStorage.setItem(storageKey, preference); } catch { /* Use this page's preference when storage is unavailable. */ }
-      applyTheme(preference);
+      applyTheme(preference, true);
     });
   });
 
   media.addEventListener("change", () => {
-    if (currentPreference === "system") applyTheme("system");
+    if (currentPreference === "system") applyTheme("system", true);
   });
-  window.addEventListener("storage", (event) => { if (event.key === storageKey || event.key === null) applyTheme(readPreference()); });
+  window.addEventListener("storage", (event) => { if (event.key === storageKey || event.key === null) applyTheme(readPreference(), true); });
+  reducedMotion.addEventListener("change", () => { if (reducedMotion.matches) applyTheme(currentPreference); });
 
   applyTheme(readPreference());
 </script>

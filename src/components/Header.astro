@@ -19,7 +19,7 @@ const links = [
 
 <header class="site-header" data-pagefind-ignore="all">
   <div class="site-shell site-header__inner">
-    <a class="wordmark" href="/" {...uiAttrs({ "aria-label": { zh: "y4ho0's Garden 首页", en: "y4ho0's Garden home" } })}>y4ho0's Garden</a>
+    <a class="wordmark" href="/" {...uiAttrs({ "aria-label": { zh: "Yahoo 首页", en: "Yahoo home" } })}>Yahoo</a>
     <nav class="site-nav" {...uiAttrs({ "aria-label": { zh: "主导航", en: "Primary navigation" } })}>
       {links.map(([zh, en, href]) => <a href={href} aria-current={pathname.startsWith(href) ? "page" : undefined}><UiText zh={zh} en={en} /></a>)}
       <SearchDialog />

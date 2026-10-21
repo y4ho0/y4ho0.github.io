@@ -294,6 +294,9 @@ test("admin shares the homepage theme preference without disturbing writing or p
   await expect(root).toHaveAttribute("data-theme-preference", "dark");
   await expect(theme("dark")).toHaveAttribute("aria-pressed", "true");
   await expect.poll(() => preview.locator("body").evaluate(() => matchMedia("(prefers-color-scheme: dark)").matches)).toBe(true);
+  // The palette now deliberately eases between themes. Assess final contrast
+  // after the transition, while separate motion tests check intermediate colors.
+  await expect(root).not.toHaveAttribute("data-theme-transition");
   const colors = await page.evaluate(() => {
     const luminance = (value: string) => {
       const [red, green, blue] = (value.match(/[\d.]+/gu) ?? []).slice(0, 3).map(Number);

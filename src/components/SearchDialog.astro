@@ -1,11 +1,12 @@
 ---
 import SearchInterface from "./SearchInterface.astro";
+import SearchIcon from "./SearchIcon.astro";
 import UiText from "./UiText.astro";
 import { uiAttrs } from "../lib/ui-language";
 ---
 
-<button class="search-trigger" type="button" aria-haspopup="dialog" aria-controls="search-dialog" aria-expanded="false" data-search-open>
-  <span><UiText zh="搜索" en="Search" /></span><kbd aria-hidden="true">⌘K</kbd>
+<button class="search-trigger" type="button" aria-haspopup="dialog" aria-controls="search-dialog" aria-expanded="false" data-search-open {...uiAttrs({ "aria-label": { zh: "搜索", en: "Search" }, title: { zh: "搜索（⌘ / Ctrl + K）", en: "Search (⌘ / Ctrl + K)" } })}>
+  <SearchIcon />
 </button>
 <dialog class="search-dialog" id="search-dialog" aria-labelledby="search-dialog-title">
   <div class="search-dialog__header">

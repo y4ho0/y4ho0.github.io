@@ -1,6 +1,7 @@
 ---
 import ThemeControl from "./ThemeControl.astro";
 import LanguageControl from "./LanguageControl.astro";
+import SearchIcon from "./SearchIcon.astro";
 import UiText from "./UiText.astro";
 import { uiAttrs } from "../lib/ui-language";
 
@@ -23,7 +24,7 @@ const links = [
     <button class="mobile-menu__close" type="button" {...uiAttrs({ "aria-label": { zh: "关闭菜单", en: "Close menu" } })}><UiText zh="关闭" en="Close" /></button>
   </div>
   <nav {...uiAttrs({ "aria-label": { zh: "移动导航", en: "Mobile navigation" } })}>
-    {links.map(([zh, en, href]) => <a href={href} aria-current={pathname.startsWith(href) ? "page" : undefined}><UiText zh={zh} en={en} /></a>)}
+    {links.map(([zh, en, href]) => <a href={href} class:list={{ "mobile-menu__search-link": href === "/search/" }} aria-current={pathname.startsWith(href) ? "page" : undefined} {...(href === "/search/" ? uiAttrs({ "aria-label": { zh, en }, title: { zh, en } }) : {})}>{href === "/search/" ? <SearchIcon /> : <UiText zh={zh} en={en} />}</a>)}
   </nav>
   <div class="mobile-menu__theme"><span><UiText zh="主题" en="Theme" /></span><ThemeControl localized /></div>
   <div class="mobile-menu__theme"><span><UiText zh="语言" en="Language" /></span><LanguageControl /></div>
