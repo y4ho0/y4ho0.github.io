@@ -2,25 +2,29 @@
 import ThemeControl from "./ThemeControl.astro";
 import MobileNav from "./MobileNav.astro";
 import SearchDialog from "./SearchDialog.astro";
+import LanguageControl from "./LanguageControl.astro";
+import UiText from "./UiText.astro";
+import { uiAttrs } from "../lib/ui-language";
 
 const pathname = Astro.url.pathname;
 const links = [
-  ["Garden", "/garden/"],
-  ["Courses", "/courses/"],
-  ["Labs", "/labs/"],
-  ["Essays", "/essays/"],
-  ["Archive", "/archive/"],
-  ["About", "/about/"],
+  ["花园", "Garden", "/garden/"],
+  ["课程", "Courses", "/courses/"],
+  ["实验", "Labs", "/labs/"],
+  ["随笔", "Essays", "/essays/"],
+  ["归档", "Archive", "/archive/"],
+  ["关于", "About", "/about/"],
 ] as const;
 ---
 
 <header class="site-header" data-pagefind-ignore="all">
   <div class="site-shell site-header__inner">
-    <a class="wordmark" href="/" aria-label="y4ho0's Garden home">y4ho0's Garden</a>
-    <nav class="site-nav" aria-label="Primary navigation">
-      {links.map(([label, href]) => <a href={href} aria-current={pathname.startsWith(href) ? "page" : undefined}>{label}</a>)}
+    <a class="wordmark" href="/" {...uiAttrs({ "aria-label": { zh: "y4ho0's Garden 首页", en: "y4ho0's Garden home" } })}>y4ho0's Garden</a>
+    <nav class="site-nav" {...uiAttrs({ "aria-label": { zh: "主导航", en: "Primary navigation" } })}>
+      {links.map(([zh, en, href]) => <a href={href} aria-current={pathname.startsWith(href) ? "page" : undefined}><UiText zh={zh} en={en} /></a>)}
       <SearchDialog />
-      <ThemeControl />
+      <ThemeControl localized />
+      <LanguageControl />
     </nav>
     <MobileNav />
   </div>

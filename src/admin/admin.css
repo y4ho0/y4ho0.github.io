@@ -4,7 +4,8 @@ body { background-image: none; font-family: var(--font-body); line-height: 1.55;
 .admin-header h1 { margin:0; font:400 2rem var(--font-body); }
 .admin-header-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:.7rem 1rem; }
 .theme-control { display:inline-flex; gap:.2rem; padding:.2rem; border:1px solid var(--color-border); border-radius:999px; background:var(--color-surface); }
-.theme-control button { min-height:2.5rem; border:0; border-radius:999px; background:transparent; color:var(--color-muted-readable); padding:.3rem .7rem; font-family:inherit; }
+.theme-control button { display:grid; place-items:center; flex:0 0 auto; width:2.5rem; height:2.5rem; min-width:40px; min-height:40px; border:0; border-radius:999px; background:transparent; color:var(--color-muted-readable); padding:0; font-family:inherit; }
+.theme-control button svg { display:block; width:18px; height:18px; }
 .theme-control button[aria-pressed=true] { background:var(--color-action); color:var(--color-background); box-shadow:none; }
 .eyebrow { font-size:.7rem; letter-spacing:.14em; margin:0 0 .4rem; color:var(--color-action); }
 .admin-main { max-width:112rem; margin:auto; padding:1.5rem 2rem 3rem; }

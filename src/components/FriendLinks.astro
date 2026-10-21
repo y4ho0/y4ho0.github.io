@@ -1,9 +1,10 @@
 ---
 import { friends } from "../data/friends";
+import UiText from "./UiText.astro";
 ---
 
 <section aria-labelledby="friend-links-title">
-  <h2 id="friend-links-title">友链</h2>
+  <h2 id="friend-links-title"><UiText zh="友链" en="Friends" /></h2>
   <ul class="friend-links">
     {friends.map(friend => <li>
       <a class="friend-link" href={friend.link} target="_blank" rel="noopener noreferrer">

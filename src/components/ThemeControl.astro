@@ -1,11 +1,27 @@
 ---
-interface Props { labels?: { system: string; light: string; dark: string }; label?: string }
-const { labels = { system: "System", light: "Light", dark: "Dark" }, label = "Color theme" } = Astro.props;
+import { uiAttrs } from "../lib/ui-language";
+
+interface Props { labels?: { system: string; light: string; dark: string }; label?: string; localized?: boolean }
+const { labels = { system: "System", light: "Light", dark: "Dark" }, label = "Color theme", localized = false } = Astro.props;
+const names = {
+  system: { zh: "跟随系统", en: "System" },
+  light: { zh: "浅色", en: "Light" },
+  dark: { zh: "深色", en: "Dark" },
+};
+const buttonAttrs = (value: "system" | "light" | "dark") => localized
+  ? uiAttrs({ "aria-label": names[value], title: names[value] })
+  : { "aria-label": labels[value], title: labels[value] };
 ---
-<div class="theme-control" role="group" aria-label={label}>
-  <button type="button" data-theme-value="system" aria-pressed="true">{labels.system}</button>
-  <button type="button" data-theme-value="light" aria-pressed="false">{labels.light}</button>
-  <button type="button" data-theme-value="dark" aria-pressed="false">{labels.dark}</button>
+<div class="theme-control" role="group" {...(localized ? uiAttrs({ "aria-label": { zh: "颜色主题", en: "Color theme" } }) : { "aria-label": label })}>
+  <button type="button" data-theme-value="system" aria-pressed="true" {...buttonAttrs("system")}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
+  </button>
+  <button type="button" data-theme-value="light" aria-pressed="false" {...buttonAttrs("light")}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" /></svg>
+  </button>
+  <button type="button" data-theme-value="dark" aria-pressed="false" {...buttonAttrs("dark")}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20.9 13.2A9 9 0 0 1 10.8 3.1a9 9 0 1 0 10.1 10.1Z" /></svg>
+  </button>
 </div>
 
 <script>

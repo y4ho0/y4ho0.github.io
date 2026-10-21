@@ -1,0 +1,9 @@
+.ui-text > [data-ui-lang="en"] { display:none; }
+:root[data-ui-language="en"] .ui-text > [data-ui-lang="zh-CN"] { display:none; }
+:root[data-ui-language="en"] .ui-text > [data-ui-lang="en"] { display:initial; }
+.language-control { display:inline-flex; align-items:center; gap:.15rem; padding:.2rem; border:1px solid var(--color-border); border-radius:999px; background:var(--color-surface); }
+.language-control button { min-height:2.5rem; padding:.3rem .55rem; border:0; border-radius:999px; background:transparent; color:var(--color-muted-readable); font:inherit; font-size:.8rem; cursor:pointer; }
+.language-control button[aria-pressed="true"] { color:var(--color-background); background:var(--color-action); }
+.language-control button:hover { color:var(--color-text); }
+.language-control button[aria-pressed="true"]:hover { color:var(--color-background); }
+.mobile-menu__language { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-top:1rem; }

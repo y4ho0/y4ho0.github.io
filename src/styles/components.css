@@ -97,8 +97,14 @@
 }
 
 .theme-control button {
-  min-height: 2.75rem;
-  padding: 0.3rem 0.62rem;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -108,6 +114,8 @@
   font-size: 0.75rem;
   transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
 }
+
+.theme-control button svg { display: block; width: 18px; height: 18px; }
 
 .theme-control button[aria-pressed="true"] {
   background: var(--color-action);
@@ -771,9 +779,9 @@
   font-size: 0.8rem;
 }
 
-@media (max-width: 60rem) {
+@media (max-width: 72rem) {
   .site-nav { display: contents; }
-  .site-nav > :is(a, .search-trigger, .theme-control) { display: none; }
+  .site-nav > :is(a, .search-trigger, .theme-control, .language-control) { display: none; }
   .mobile-menu-trigger { display: inline-flex; align-items: center; }
 
   .site-header__inner {

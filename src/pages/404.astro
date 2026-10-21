@@ -1,14 +1,15 @@
 ---
+import UiText from "../components/UiText.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import DuckMark from "../components/DuckMark.astro";
 ---
 
-<BaseLayout title="Page not found" description="The requested path does not exist." noindex>
+<BaseLayout title="页面未找到" titleEn="Page not found" description="请求的路径不存在。" descriptionEn="The requested path does not exist." noindex>
   <section class="not-found site-shell">
-    <DuckMark size="large" label="A pixel-art white duck reclining on a peach pillow with one wing bent behind its head" />
+    <DuckMark size="large" />
     <p class="eyebrow">404</p>
-    <h1>This path has not grown here.</h1>
-    <p>The page may have moved, or it may never have been planted.</p>
-    <a class="button-link" href="/">Return to the garden</a>
+    <h1><UiText zh="这里还没有长出这条小径。" en="This path has not grown here." /></h1>
+    <p><UiText zh="页面可能已经搬走，也可能还未在这里种下。" en="The page may have moved, or it may never have been planted." /></p>
+    <a class="button-link" href="/"><UiText zh="返回花园" en="Return to the garden" /></a>
   </section>
 </BaseLayout>

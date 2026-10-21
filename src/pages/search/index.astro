@@ -1,11 +1,12 @@
 ---
+import UiText from "../../components/UiText.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import SearchInterface from "../../components/SearchInterface.astro";
 ---
 
-<BaseLayout title="Search" description="Search the public content in y4ho0's Garden.">
+<BaseLayout title="搜索" titleEn="Search" description="搜索 y4ho0 的花园中的公开内容。" descriptionEn="Search the public content in y4ho0's Garden.">
   <section class="page-shell site-shell" aria-labelledby="search-title">
-    <header class="page-header"><p class="eyebrow">Search</p><h1 id="search-title">Find a path through the garden</h1><p>The index contains only published article content.</p></header>
+    <header class="page-header"><p class="eyebrow"><UiText zh="搜索" en="Search" /></p><h1 id="search-title"><UiText zh="在花园里找到一条路径" en="Find a path through the garden" /></h1><p><UiText zh="搜索索引只收录已经公开的文章内容。" en="The index contains only published article content." /></p></header>
     <SearchInterface autofocus />
   </section>
 </BaseLayout>

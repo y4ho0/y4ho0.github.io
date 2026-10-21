@@ -26,7 +26,7 @@
 5. 打开 `/admin/`，将令牌粘贴到密码框，点击“连接 GitHub”。成功后加载文章与媒体；无效令牌或不能证明仓库写权限的凭据会被拒绝。
 6. 写作结束点击“退出并清除凭据”；必要时到 GitHub 撤销令牌。刷新、关闭页面也会丢失此页面的认证，需要重新连接。
 
-令牌仅存在当前页面的 JavaScript 内存中，不写入 localStorage、sessionStorage、IndexedDB、文章、URL、构建产物或仓库。localStorage 只保存布局、主题与 Markdown 快捷键偏好。每次上传、提交和删除前重新做身份及权限预检，最终仍由 GitHub 对实际写请求执行授权。
+令牌仅存在当前页面的 JavaScript 内存中，不写入 localStorage、sessionStorage、IndexedDB、文章、URL、构建产物或仓库。localStorage 只保存布局、主题、Markdown 快捷键及公开页面语言偏好。每次上传、提交和删除前重新做身份及权限预检，最终仍由 GitHub 对实际写请求执行授权。
 
 权限预检同时要求账号的仓库 push 权限，以及仓库响应中只能在具备 Contents 读写权限时读取的合并设置；缺失时保守拒绝。此检查不能保证分支保护、规则集或后来撤销的权限允许提交。官方依据见[获取仓库](https://docs.github.com/en/rest/repos/repos#get-a-repository)。读取公开文件成功或响应头 `X-Accepted-GitHub-Permissions` 都不能单独证明令牌获得写权限；该响应头表示端点要求的权限，见[GitHub 排错说明](https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api#resource-not-accessible)。
 
@@ -66,7 +66,7 @@
 
 窄屏自动使用切换布局。恢复宽屏后会尽可能恢复之前选择；布局偏好保存于 localStorage，认证信息不会随之保存。
 
-顶部主题控件与主页共用“跟随系统 / 浅色 / 深色”设置和 `garden-theme` 偏好，切换或刷新后保持一致。后台界面、下拉菜单及实时预览都同步主题，代码使用对应的浅/深色高亮；主题切换不重新创建编辑器或预览，不改变选区和滚动位置。发布状态选项保持整行，空间不足时 RSS 选项整体移到下一行。
+顶部主题控件用显示器 / 太阳 / 月亮图标分别表示“跟随系统 / 浅色 / 深色”，与主页共用设置和 `garden-theme` 偏好，悬停及无障碍名称保留对应说明，切换或刷新后保持一致。后台界面、下拉菜单及实时预览都同步主题，代码使用对应的浅/深色高亮；主题切换不重新创建编辑器或预览，不改变选区和滚动位置。发布状态选项保持整行，空间不足时 RSS 选项整体移到下一行。
 
 ## Markdown 工具与快捷键
 
@@ -169,7 +169,7 @@ npm run test:browser
 
 `npm run build` 包含每日引言生成、Astro 生产构建、Pagefind 索引和产物内部链接验证。发布验收应覆盖：未登录、无效令牌、无写权限、新建与编辑、IndexedDB 恢复、提交结果、双栏实时预览、切换后的选区与滚动、手机窄屏、代码和公式、恶意 HTML、API 失败、并发冲突和生产构建。
 
-本次在 Node.js 24 验证：`npm test` 的 94 项测试通过（含临时目录中的真实 Astro 构建、五集合与引用、路由、公式、RSS 和 Sitemap）；`npm run check` 为零错误、零警告，另有兼容 API 弃用提示（原生编辑历史、平台识别及输入法兼容判断）；完整 `npm run build` 通过，包括 Pagefind 和输出验证。浏览器回归 23 项全部通过，包括工具栏、跨段落格式、原生撤销／重做、自定义快捷键持久化及冲突、Mac Command、实际字体、夜间模式、键盘选择、320px / 390px 控件布局、拖拽和粘贴上传；远端结果见 Pull Request 检查记录。
+本次在 Node.js 24 验证：`npm test` 的 97 项测试通过（含临时目录中的真实 Astro 构建、五集合与引用、路由、公式、RSS 和 Sitemap）；`npm run check` 为零错误、零警告，另有兼容 API 弃用提示（原生编辑历史、平台识别及输入法兼容判断）；完整 `npm run build` 通过，包括 Pagefind 和输出验证。浏览器回归 31 项全部通过（后台 23 项，公开界面语言 8 项），包括工具栏、跨段落格式、原生撤销／重做、自定义快捷键持久化及冲突、Mac Command、实际字体、夜间模式、键盘选择、320px / 390px 控件布局、拖拽和粘贴上传；远端结果见 Pull Request 检查记录。
 
 API 与浏览器测试使用模拟 GitHub 响应覆盖认证、写权限不足、新建、编辑、删除、媒体、失败、SHA 冲突和部署状态，不代表使用真实 fine-grained PAT 写入 main 或线上部署成功。已通过当前开发账号的只读仓库 API 确认权限预检所需字段；真实文章写入与线上部署须分别检查实际提交及 Actions。后台在 PR 合并并成功部署后才上线，最终远端验证结果见该 Pull Request 的检查记录。
 

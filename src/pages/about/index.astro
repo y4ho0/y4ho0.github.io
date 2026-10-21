@@ -1,24 +1,25 @@
 ---
+import UiText from "../../components/UiText.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import FriendLinks from "../../components/FriendLinks.astro";
 ---
 
-<BaseLayout title="About This Site" description="How this digital garden is structured and maintained.">
+<BaseLayout title="关于本站" titleEn="About This Site" description="这座数字花园的结构与维护方式。" descriptionEn="How this digital garden is structured and maintained.">
   <article class="page-shell site-shell prose" data-pagefind-body>
     <span data-filter-value="Site" data-pagefind-filter="type[data-filter-value]" data-pagefind-ignore></span>
-    <header class="page-header"><p class="eyebrow">About This Site</p><h1 data-pagefind-meta="title">A quiet place for public work</h1><p data-pagefind-meta="description">This page describes the site itself.</p></header>
-    <h2>Structure</h2>
-    <p>The garden separates courses, notes, labs, projects, and essays so each kind of material can keep an appropriate shape. Empty sections remain visible as honest empty states.</p>
-    <h2>Content status</h2>
-    <p>Seedling, growing, and evergreen describe editorial maturity only. They are not measures of learning progress or skill.</p>
-    <h2>Technology</h2>
-    <p>The site is statically generated with Astro and TypeScript. Markdown content, native CSS and browser APIs keep pages durable and lightweight.</p>
-    <h2>Daily quote</h2>
-    <p>A build-time process selects and validates one external quote per Asia/Shanghai calendar day. It reuses the currently published state and hides the quote when no safe source is available.</p>
-    <h2>Privacy</h2>
-    <p>The site does not publish personal identity, education, location, contact, résumé, employment, competition, research, internship, or skill-rating information.</p>
-    <h2>Source</h2>
-    <p>The source is available in the <a href="https://github.com/y4ho0/y4ho0.github.io">public GitHub repository</a>.</p>
+    <header class="page-header"><p class="eyebrow"><UiText zh="关于本站" en="About This Site" /></p><h1 data-pagefind-meta="title"><UiText zh="一个安静记录的地方" en="A quiet place for public work" /></h1><p data-pagefind-meta="description"><UiText zh="这里介绍网站本身。" en="This page describes the site itself." /></p></header>
+    <h2><UiText zh="内容结构" en="Structure" /></h2>
+    <p><UiText zh="花园将课程、笔记、实验、项目和随笔分开，让不同内容各有适合的位置。尚无内容的栏目会如实保留空状态。" en="The garden separates courses, notes, labs, projects, and essays so each kind of material can keep an appropriate shape. Empty sections remain visible as honest empty states." /></p>
+    <h2><UiText zh="成长状态" en="Content status" /></h2>
+    <p><UiText zh="萌芽、成长和常青只表示文章的完善程度，不衡量学习进度或能力。" en="Seedling, growing, and evergreen describe editorial maturity only. They are not measures of learning progress or skill." /></p>
+    <h2><UiText zh="技术" en="Technology" /></h2>
+    <p><UiText zh="网站使用 Astro 与 TypeScript 静态生成，以 Markdown、原生 CSS 和浏览器 API 保持页面轻量、易于维护。" en="The site is statically generated with Astro and TypeScript. Markdown content, native CSS and browser APIs keep pages durable and lightweight." /></p>
+    <h2><UiText zh="每日一言" en="Daily quote" /></h2>
+    <p><UiText zh="构建时会按上海时区的日期选取并验证一条外部引言，复用当前已发布的结果；没有可靠来源时，则隐藏引言。" en="A build-time process selects and validates one external quote per Asia/Shanghai calendar day. It reuses the currently published state and hides the quote when no safe source is available." /></p>
+    <h2><UiText zh="隐私" en="Privacy" /></h2>
+    <p><UiText zh="本站不公开个人身份、教育、位置、联系方式、简历、工作、竞赛、研究、实习或能力评级信息。" en="The site does not publish personal identity, education, location, contact, résumé, employment, competition, research, internship, or skill-rating information." /></p>
+    <h2><UiText zh="源代码" en="Source" /></h2>
+    <p><UiText zh="源代码公开在 " en="The source is available in the " /><a href="https://github.com/y4ho0/y4ho0.github.io"><UiText zh="GitHub 仓库" en="public GitHub repository" /></a><UiText zh="。" en="." /></p>
     <FriendLinks />
   </article>
 </BaseLayout>

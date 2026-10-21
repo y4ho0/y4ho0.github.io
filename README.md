@@ -61,6 +61,14 @@ Supported block names are `theorem`, `proof`, `definition`, `lemma`, `propositio
 
 The public site avoids personal identity, education, residence, contact, résumé, employment, competition, research, internship, and skill-rating information. Optional post-location metadata represents only an explicitly chosen publication location; it must not be used to infer or publish a home address. The About page documents only the site itself.
 
+## Interface language
+
+Public pages default to Simplified Chinese. Use the **中文 / EN** control in the desktop header or mobile menu to switch to English; the preference is saved as `garden-language` in localStorage and applies across pages. Theme controls use monitor / sun / moon icons with translated tooltips and accessible names.
+
+Language switching updates interface labels, page titles, descriptions, search messages, and date formatting without reloading the page. Article titles, summaries, Markdown, tags, place names, daily quotes, and friend profiles remain in their original language. URLs, content schemas, RSS and sitemap routes are unchanged. The management interface at `/admin/` continues to use Chinese.
+
+Static output and search indexing use the default Chinese interface plus original article content. The alternate English UI text is excluded from Pagefind so labels are not indexed twice. Search queries make CJK word boundaries explicit so Chinese search also works when Pagefind is first loaded in English mode; this does not translate queries or content. No translation service or runtime dependency is added. Without JavaScript, the public pages remain readable in Chinese.
+
 ## Friend links
 
 Friend links appear on `/about/`. Add or update entries in `src/data/friends.ts` using `title`, optional `description`, `avatarUrl`, and `link`. Cards follow the site's typography and light/dark theme.

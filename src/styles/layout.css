@@ -86,11 +86,11 @@
   text-decoration: none;
 }
 
-.hero__link span {
+.hero__link > span[aria-hidden="true"] {
   transition: transform 180ms ease;
 }
 
-.hero__link:hover span {
+.hero__link:hover > span[aria-hidden="true"] {
   transform: translate(0.15rem, -0.15rem);
 }
 
