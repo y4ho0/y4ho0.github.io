@@ -29,6 +29,8 @@ Content lives in Astro Content Collections under `src/content/`:
 
 Draft entries are validated but excluded from production routes, feeds, sitemaps, archives, and search.
 
+Browser-based article management is available at `/admin/`. See [后台使用与认证配置](ADMIN_GUIDE.md) for local drafts, GitHub publishing, editor layouts, security limits, and validation steps.
+
 Notes, labs, projects, and essays may opt into the homepage post-location map. The `region` key groups entries at the same place, so its name and coordinates must remain consistent:
 
 ```yaml
