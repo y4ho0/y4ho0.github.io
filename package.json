@@ -27,7 +27,7 @@
     "dompurify": "^3.4.17",
     "gray-matter": "^4.0.3",
     "highlight.js": "^11.12.0",
-    "katex": "^0.17.0",
+    "katex": "^0.19.0",
     "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.1",
     "rehype-stringify": "^10.0.1",
@@ -40,6 +40,7 @@
     "unist-util-visit": "^5.1.0",
     "yaml": "^2.9.1"
   },
+  "overrides": { "katex": "$katex" },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
     "@playwright/test": "^1.64.1",

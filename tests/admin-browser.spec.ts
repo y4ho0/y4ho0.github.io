@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Locator } from "@playwright/test";
 
 // Every GitHub request is intercepted. These tests never use a real credential or repository write.
 const TOKEN = "github_pat_FAKE_BROWSER_TEST_TOKEN_123456789";
@@ -75,6 +75,7 @@ async function mockGitHub(page: Page, initial: Record<string, File> = {}) {
 async function openAdmin(page: Page) {
   await page.goto("/admin/");
   await expect(page.locator("#entry-path")).toContainText("新文件 →");
+  await page.locator("#metadata-panel > summary").click();
 }
 
 async function login(page: Page) {
@@ -112,6 +113,32 @@ async function storedDocuments(page: Page): Promise<string> {
   });
 }
 
+/** Chromium reports the fonts that supplied actual glyphs, beyond computed CSS declarations. */
+async function actualGlyphFonts(page: Page, target: Locator) {
+  const marker = `probe-${Math.random().toString(36).slice(2)}`;
+  await target.evaluate((element, value) => element.setAttribute("data-admin-font-probe", value), marker);
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send("DOM.enable");
+    await session.send("CSS.enable");
+    const tree = await session.send("DOM.getDocument", { depth: -1, pierce: true });
+    type Node = { nodeId: number; attributes?: string[]; children?: Node[]; contentDocument?: Node };
+    const find = (node: Node): number | undefined => {
+      const attributes = node.attributes ?? [];
+      const index = attributes.indexOf("data-admin-font-probe");
+      if (index >= 0 && attributes[index + 1] === marker) return node.nodeId;
+      for (const child of node.children ?? []) { const match = find(child); if (match) return match; }
+      if (node.contentDocument) return find(node.contentDocument);
+      return undefined;
+    };
+    const nodeId = find(tree.root);
+    if (!nodeId) throw new Error("Font probe could not find the preview node in Chromium's document tree.");
+    return (await session.send("CSS.getPlatformFontsForNode", { nodeId })).fonts.filter(font => font.glyphCount > 0);
+  } finally {
+    await session.detach();
+  }
+}
+
 test("unauthenticated access and rejected tokens never enable repository writes", async ({ page }) => {
   const api = await mockGitHub(page);
   await openAdmin(page);
@@ -135,6 +162,22 @@ test("unauthenticated access and rejected tokens never enable repository writes"
   await expect(page.locator("#logout")).toBeHidden();
   expect(api.requests.some(request => request.path.endsWith("/git/trees/main"))).toBe(false);
   expect(api.puts).toHaveLength(0);
+});
+
+test("default layout keeps advanced metadata compact and collapses the library on narrow screens", async ({ page }) => {
+  await mockGitHub(page);
+  await page.goto("/admin/");
+  await expect(page.locator("#entry-path")).toContainText("新文件 →");
+  await expect(page.locator("#metadata-panel")).not.toHaveAttribute("open");
+  await expect(page.locator("#library-panel")).toHaveAttribute("open", "");
+  await expect(page.locator("#writing-area")).toHaveAttribute("data-layout", "split");
+  const desktopWriting = await page.locator("#writing-area").boundingBox();
+  expect(desktopWriting!.y).toBeLessThan(1000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator("#metadata-panel")).not.toHaveAttribute("open");
+  await expect(page.locator("#library-panel")).not.toHaveAttribute("open");
+  await expect(page.locator("#writing-area")).toHaveAttribute("data-layout", "tabs");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 test("local drafts recover after reload while token disappears from all browser stores", async ({ page }) => {
@@ -197,6 +240,17 @@ test("split preview renders GFM, highlighted code and math while hostile HTML ca
   await expect(preview.locator("blockquote")).toContainText("quotation");
   await expect(preview.locator(".hljs-keyword")).toContainText("const");
   await expect(preview.locator(".katex")).toHaveCount(2);
+  const mathFonts = await preview.locator("article").evaluate(async () => {
+    await document.fonts.ready;
+    const loaded: string[] = [];
+    for (const face of document.fonts) if (face.status === "loaded") loaded.push(face.family);
+    return { loaded, family: getComputedStyle(document.querySelector(".mathnormal")!).fontFamily };
+  });
+  expect(mathFonts.loaded).toContain("KaTeX_Main");
+  expect(mathFonts.loaded).toContain("KaTeX_Math");
+  expect(mathFonts.family).toContain("KaTeX_Math");
+  const renderedMathFonts = await actualGlyphFonts(page, preview.locator(".mathnormal").first());
+  expect(renderedMathFonts.some(font => font.isCustomFont && font.familyName === "KaTeX_Math")).toBe(true);
   await expect(preview.locator("script,[onerror],a[href^='javascript:']")).toHaveCount(0);
   expect(await page.evaluate(() => (window as any).__adminXss)).toBe(0);
   await expect(page.locator("#preview")).toHaveAttribute("sandbox", "");
@@ -205,6 +259,52 @@ test("split preview renders GFM, highlighted code and math while hostile HTML ca
   await expect(separator).toHaveAttribute("aria-valuenow", "52");
   await page.locator("#markdown").fill("## Updated live\n\nContent changed.");
   await expect(preview.getByRole("heading", { name: "Updated live" })).toBeVisible();
+});
+
+test("preview uses the self-hosted Chinese body font across formatting while code and math keep their own fonts", async ({ page }) => {
+  const fontErrors: string[] = [];
+  const fontFailures: string[] = [];
+  page.on("console", item => { if (item.type() === "error" && /font|cors|content security policy/iu.test(item.text())) fontErrors.push(item.text()); });
+  page.on("requestfailed", request => { if (request.resourceType() === "font") fontFailures.push(request.url()); });
+  await mockGitHub(page); await openAdmin(page);
+  await page.locator("#markdown").fill([
+    "## 中文标题", "", "中文正文", "", "**中文加粗**与*中文斜体*。", "", "> 中文引用", "", "- 中文列表", "",
+    "| 中文表头 | 数值 |", "| --- | --- |", "| 中文单元格 | 1 |", "", "[中文链接](https://example.com)", "",
+    "行内代码：`const inline = 1`", "", "```js", "const answer = 42;", "```", "",
+    "$E=mc^2$", "", "$$", "\\frac{x+1}{y_1}=\\begin{pmatrix}a&b\\\\c&d\\end{pmatrix}", "$$",
+  ].join("\n"));
+  const preview = page.frameLocator("#preview");
+  await expect(preview.getByRole("heading", { name: "中文标题" })).toBeVisible();
+  await expect(preview.locator(".mfrac")).toHaveCount(1);
+  await expect(preview.locator(".mtable")).toHaveCount(1);
+  const typography = await preview.locator("article").evaluate(async article => {
+    await document.fonts.ready;
+    const fonts: { family: string; status: string; weight: string }[] = [];
+    for (const face of document.fonts) fonts.push({ family: face.family, status: face.status, weight: face.weight });
+    const body = getComputedStyle(document.body);
+    const prose = getComputedStyle(article);
+    const text = ["h2", "strong", "em", "blockquote p", "li", "th", "td", "a"].map(selector => ({ selector, family: getComputedStyle(article.querySelector(selector)!).fontFamily }));
+    // Raw HTML remains disabled in Markdown; DOM probes also verify the shared kbd/samp CSS contract.
+    for (const name of ["kbd", "samp"]) { const element = document.createElement(name); element.textContent = name; article.append(element); }
+    const code = ["p code", "pre code", ".hljs-keyword", "kbd", "samp"].map(selector => ({ selector, family: getComputedStyle(article.querySelector(selector)!).fontFamily }));
+    return { fonts, body: { family: body.fontFamily, weight: body.fontWeight }, prose: { family: prose.fontFamily, weight: prose.fontWeight }, text, code, math: getComputedStyle(article.querySelector(".mathnormal")!).fontFamily };
+  });
+  expect(typography.body.family).toContain("LXGW WenKai Screen");
+  expect(typography.body.weight).toBe("400");
+  expect(typography.prose.family).toContain("LXGW WenKai Screen");
+  expect(typography.prose.weight).toBe("400");
+  expect(typography.fonts.some(face => face.family === "LXGW WenKai Screen" && face.status === "loaded" && face.weight === "400")).toBe(true);
+  for (const sample of typography.text) expect(sample.family, sample.selector).toContain("LXGW WenKai Screen");
+  for (const sample of typography.code) {
+    expect(sample.family, sample.selector).toMatch(/monospace/iu);
+    expect(sample.family, sample.selector).not.toContain("LXGW WenKai Screen");
+  }
+  expect(typography.math).toContain("KaTeX_Math");
+  const chineseGlyphFonts = await actualGlyphFonts(page, preview.locator("p").filter({ hasText: /^中文正文$/u }));
+  expect(chineseGlyphFonts.some(font => font.isCustomFont && font.familyName.includes("LXGW"))).toBe(true);
+  expect(chineseGlyphFonts.every(font => font.isCustomFont)).toBe(true);
+  expect(fontFailures).toEqual([]);
+  expect(fontErrors).toEqual([]);
 });
 
 test("tab switching keeps one editor, text, selection and scroll; narrow screens restore wide preference", async ({ page }) => {
@@ -369,8 +469,8 @@ test("image uploads validate type, commit exact bytes and insert a reusable Mark
   await page.locator('[name="id"]').fill("media-post");
   await page.locator("#media-panel summary").click();
   await page.locator("#media-file").setInputFiles({ name: "unsafe.svg", mimeType: "image/svg+xml", buffer: Buffer.from('<svg onload="alert(1)"/>') });
-  await page.locator("#upload").click();
-  await expect(page.locator("#notice")).toContainText("仅支持 5 MiB 以内");
+  await expect(page.locator("#notice")).toContainText("仅支持 PNG、JPEG、GIF 和 WebP");
+  await expect(page.locator("#upload")).toBeDisabled();
   expect(api.puts).toHaveLength(0);
   await page.locator("#media-file").setInputFiles({ name: "valid.png", mimeType: "image/png", buffer: PNG });
   await page.locator("#upload").click();
@@ -388,4 +488,66 @@ test("image uploads validate type, commit exact bytes and insert a reusable Mark
   await page.locator("#insert-media").click();
   await expect(page.locator("#markdown")).toHaveValue(`![图片说明](${upload.path.replace(/^public/u, "")})![图片说明](${upload.path.replace(/^public/u, "")})`);
   expect(api.puts).toHaveLength(1);
+});
+
+test("dropping an image stages it and requires authenticated confirmation before uploading", async ({ page }) => {
+  const api = await mockGitHub(page); await openAdmin(page);
+  await page.locator('[name="id"]').fill("dropped-image");
+  await page.locator("#media-panel summary").click();
+  const dropImage = async () => {
+    const transfer = await page.evaluateHandle(base64 => {
+      const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
+      const data = new DataTransfer();
+      data.items.add(new File([bytes], "dropped.png", { type: "image/png" }));
+      return data;
+    }, PNG.toString("base64"));
+    try { await page.locator("#media-dropzone").dispatchEvent("drop", { dataTransfer: transfer }); }
+    finally { await transfer.dispose(); }
+  };
+  await dropImage();
+  expect(api.puts).toHaveLength(0);
+  await expect(page.locator("#upload")).toBeDisabled();
+  await login(page);
+  await dropImage();
+  await expect(page.locator("#media-pending")).toContainText("dropped.png");
+  expect(api.puts).toHaveLength(0);
+  await page.locator("#upload").click();
+  await expect(page.locator("#confirm-title")).toHaveText("公开上传图片");
+  expect(api.puts).toHaveLength(0);
+  await confirm(page);
+  await expect(page.locator("#result-text")).toContainText("图片：GitHub 提交成功");
+  expect(api.puts).toHaveLength(1);
+  expect(api.puts[0].path).toMatch(/^public\/images\/dropped-image\/[a-f0-9-]+\.png$/u);
+  expect(Buffer.from(api.puts[0].body.content, "base64")).toEqual(PNG);
+  await expect(page.locator("#markdown")).toHaveValue(`![图片说明](${api.puts[0].path.replace(/^public/u, "")})`);
+});
+
+test("pasting images stages exact bytes while ordinary text paste keeps its default behavior", async ({ page }) => {
+  const api = await mockGitHub(page); await openAdmin(page); await login(page);
+  await page.locator('[name="id"]').fill("pasted-image");
+  await page.locator("#markdown").fill("Existing text.\n");
+  const ordinaryPasteAllowed = await page.locator("#markdown").evaluate(element => {
+    const clipboard = new DataTransfer(); clipboard.setData("text/plain", "普通文本");
+    const event = new ClipboardEvent("paste", { clipboardData: clipboard, bubbles: true, cancelable: true });
+    element.dispatchEvent(event);
+    return !event.defaultPrevented;
+  });
+  expect(ordinaryPasteAllowed).toBe(true);
+  await expect(page.locator("#markdown")).toHaveValue("Existing text.\n");
+  await page.locator("#markdown").evaluate((element, base64) => {
+    const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
+    const clipboard = new DataTransfer();
+    clipboard.items.add(new File([bytes], "pasted.png", { type: "image/png" }));
+    element.dispatchEvent(new ClipboardEvent("paste", { clipboardData: clipboard, bubbles: true, cancelable: true }));
+  }, PNG.toString("base64"));
+  await expect(page.locator("#media-pending")).toContainText("pasted.png");
+  await expect(page.locator("#media-panel")).toHaveAttribute("open", "");
+  await expect(page.locator("#markdown")).toHaveValue("Existing text.\n");
+  expect(api.puts).toHaveLength(0);
+  await page.locator("#upload").click(); await confirm(page);
+  await expect(page.locator("#result-text")).toContainText("图片：GitHub 提交成功");
+  expect(api.puts).toHaveLength(1);
+  expect(api.puts[0].path).toMatch(/^public\/images\/pasted-image\/[a-f0-9-]+\.png$/u);
+  expect(Buffer.from(api.puts[0].body.content, "base64")).toEqual(PNG);
+  await expect(page.locator("#markdown")).toHaveValue(`Existing text.\n![图片说明](${api.puts[0].path.replace(/^public/u, "")})`);
 });

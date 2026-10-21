@@ -35,6 +35,8 @@ import "../../admin/admin.css";
       <div id="result" class="panel" hidden><span id="result-text"></span> <a id="commit-link" target="_blank" rel="noopener noreferrer">查看提交 ↗</a> <button id="check-deploy">检查部署</button> <span id="deploy-status"></span></div>
       <div class="workspace">
         <aside class="library panel">
+          <details id="library-panel" open>
+          <summary class="library-summary">文章库与本地草稿</summary>
           <div class="section-top"><h2>文章库</h2><button id="refresh" disabled>刷新仓库</button></div>
           <label for="collection-filter">内容集合 / 分类</label><select id="collection-filter"><option value="">全部集合</option><option>courses</option><option>notes</option><option>labs</option><option>projects</option><option>essays</option></select>
           <label for="search">搜索标题</label><input id="search" type="search" placeholder="按标题筛选" />
@@ -42,18 +44,23 @@ import "../../admin/admin.css";
           <p id="repo-count" class="muted">仓库尚未加载</p><ul id="entry-list" class="item-list"></ul>
           <h2>本地草稿</h2><p class="muted">仅保存在此浏览器，不会提交 GitHub。输入后自动保存，也可手动保存。</p><ul id="draft-list" class="item-list"></ul>
           <button id="clear-drafts">清空全部本地草稿</button>
+          </details>
         </aside>
         <section class="editor-panel panel" aria-label="文章编辑">
           <div class="section-top"><div><h2 id="editor-heading">新建文章</h2><p id="entry-path" class="muted">尚未提交 GitHub</p></div><span id="save-state">本地草稿</span></div>
           <form id="metadata" class="metadata" autocomplete="off">
+            <div class="metadata-primary">
             <label>标题<input name="title" required /></label>
-            <label>摘要<textarea name="description" rows="2" required></textarea></label>
+            <label>摘要<textarea name="description" rows="1" required></textarea></label>
+            </div>
+            <details id="metadata-panel" class="metadata-settings"><summary>文章设置 <span id="metadata-summary">集合、标签、日期与关联</span></summary>
             <div class="field-row"><label>内容集合 / 分类<select name="collection"><option>notes</option><option>courses</option><option>labs</option><option>projects</option><option>essays</option></select></label><label>文章 ID<input name="id" placeholder="例如 linear-algebra" pattern="[a-z0-9]+(-[a-z0-9]+)*" required /></label></div>
             <div class="field-row"><label>标签（逗号分隔）<input name="tags" /></label><label>成长状态<select name="status"><option value="seedling">seedling · 萌芽</option><option value="growing">growing · 成长</option><option value="evergreen">evergreen · 常青</option></select></label></div>
             <div class="field-row"><label>发布日期<input name="publishedAt" type="date" /></label><label>更新日期<input name="updatedAt" type="date" required /></label></div>
             <label id="course-field">关联课程<select name="course"><option value="">无课程</option></select><small>projects 必填。已有文章锁定课程以保留 URL。</small></label>
             <div class="field-row"><label class="check"><input name="draft" type="checkbox" />GitHub 未发布文章（draft: true，源码公开）</label><label id="feed-field" class="check"><input name="feed" type="checkbox" />加入 RSS（仅 notes）</label></div>
             <details><summary>关联文章与发帖地点</summary><label>关联文章（JSON 数组）<textarea name="related" rows="3" placeholder='[{"collection":"notes","entry":"example"}]'></textarea></label><label id="location-field">发帖地点（JSON 对象，可留空）<textarea name="location" rows="3" placeholder='{"region":"hangzhou","name":"Hangzhou","latitude":30.2741,"longitude":120.1551}'></textarea></label><p class="muted">相同 region 必须使用一致的名称和坐标。已有的其他 frontmatter 字段会保留。</p></details>
+            </details>
           </form>
           <div class="editor-toolbar"><strong>Markdown</strong><div role="group" aria-label="编辑布局"><button id="layout-split" aria-pressed="false">左右对照</button><button id="layout-tabs" aria-pressed="false">切换模式</button></div></div>
           <div id="editor-tabs" role="tablist" aria-label="编辑或预览"><button id="tab-edit" role="tab" aria-controls="edit-pane" aria-selected="true">编辑</button><button id="tab-preview" role="tab" aria-controls="preview-pane" aria-selected="false">预览</button></div>
@@ -64,7 +71,14 @@ import "../../admin/admin.css";
           </div>
           <p class="muted preview-help">支持 GFM、代码高亮、KaTeX 与语义块。预览禁用原始 HTML；语法高亮与最终 Shiki 有细微差异。正文建议从二级标题开始。</p>
           <div class="actions"><button id="save-draft">保存本地草稿</button><button id="export">导出 Markdown</button><button id="publish" class="primary" disabled>提交到 GitHub</button><button id="delete-entry" class="danger" disabled>删除仓库文章</button></div>
-          <details id="media-panel"><summary>媒体管理 · 上传 / 插入图片</summary><p class="muted">上传会立即提交到公开仓库，与文章发布独立。支持 PNG / JPEG / GIF / WebP，最多 5 MiB。图片放在 public/images/文章ID/。</p><label>上传图片<input id="media-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" disabled /></label><button id="upload" disabled>上传并插入</button><label for="media-select">已上传图片</label><select id="media-select"><option value="">选择图片</option></select><button id="insert-media" disabled>插入所选图片</button></details>
+          <details id="media-panel"><summary>媒体管理 · 拖拽 / 粘贴 / 选择图片</summary><p class="muted">确认上传后会立即提交到公开仓库，与文章发布独立。支持 PNG / JPEG / GIF / WebP，最多 5 MiB。每次处理一张图片；多张仅取第一张。图片放在 public/images/文章ID/。</p>
+            <div id="media-dropzone" class="media-dropzone" tabindex="0" role="region" aria-label="图片拖拽与粘贴区域">
+              <strong>拖拽图片到这里，或在编辑区粘贴图片</strong><span>⌘ / Ctrl + V · 也可以选择文件</span>
+              <label>选择图片<input id="media-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" /></label>
+            </div>
+            <div class="media-staged"><img id="media-thumbnail" alt="待上传图片预览" hidden /><p id="media-pending" class="muted" aria-live="polite">尚未选择图片</p><button id="clear-media" hidden>清除所选图片</button></div>
+            <button id="upload" disabled>上传并插入</button><label for="media-select">已上传图片</label><select id="media-select"><option value="">选择图片</option></select><button id="insert-media" disabled>插入所选图片</button>
+          </details>
         </section>
       </div>
     </main>

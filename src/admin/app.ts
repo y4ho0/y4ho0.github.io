@@ -1,6 +1,7 @@
 import { newEntry, parseEntry, serializeEntry, validateEntry, blockersForDelete, entryRoute, type Collection, type Entry } from "./content";
 import { GitHubClient, GitHubError, type CommitResult } from "./github";
 import { saveDraft, listDrafts, removeDraft, clearDrafts, type LocalDraft } from "./drafts";
+import { bindImageInput, validateImage } from "./media";
 
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const form = el<HTMLFormElement>("metadata");
@@ -20,6 +21,8 @@ let previewTimer = 0;
 let previewVersion = 0;
 let sessionVersion = 0;
 let lastCommit = "";
+let pendingImage: File | undefined;
+let pendingImageUrl = "";
 let position: { start: number; end: number; direction: "forward" | "backward" | "none"; scroll: number } | undefined;
 
 function notice(message: string, error = false) { el("notice").textContent = message; el("notice").dataset.error = String(error); }
@@ -41,7 +44,8 @@ function updateControls() {
   const logged = client.authenticated;
   el("login-form").hidden = logged;
   el("logout").hidden = !logged;
-  for (const id of ["refresh", "publish", "media-file", "upload"]) (el(id) as HTMLButtonElement).disabled = busy || !logged;
+  for (const id of ["refresh", "publish"]) (el(id) as HTMLButtonElement).disabled = busy || !logged;
+  el<HTMLButtonElement>("upload").disabled = busy || !logged || !pendingImage;
   el<HTMLButtonElement>("delete-entry").disabled = busy || !logged || !active.sha;
   el<HTMLButtonElement>("insert-media").disabled = busy || !logged || !el<HTMLSelectElement>("media-select").value;
   field("collection").disabled = busy || Boolean(active.sha);
@@ -53,6 +57,7 @@ function updateControls() {
   el("editor-heading").textContent = active.sha ? "编辑文章" : "新建文章";
   el("entry-path").textContent = active.path || `新文件 → src/content/${active.collection}/${active.id || "文章ID"}.md`;
   el("save-state").textContent = dirty ? "有改动 · 等待本地保存" : "本地草稿";
+  el("metadata-summary").textContent = `${active.collection} · ${active.data.status ?? "seedling"} · ${active.data.draft ? "仓库未发布" : "设为公开"}`;
 }
 
 async function run(action: () => Promise<void>) {
@@ -226,6 +231,10 @@ function restorePosition(focus = false) {
   editor.scrollTop = position.scroll;
 }
 const narrow = matchMedia("(max-width: 1100px)");
+const compactLibrary = matchMedia("(max-width: 760px)");
+const applyLibrary = () => { el<HTMLDetailsElement>("library-panel").open = !compactLibrary.matches; };
+compactLibrary.addEventListener("change", applyLibrary);
+applyLibrary();
 let preference: "split" | "tabs" | null = null;
 try { const value = localStorage.getItem("garden-admin-layout"); if (value === "split" || value === "tabs") preference = value; } catch { /* Storage may be disabled. */ }
 let selectedTab: "edit" | "preview" = "edit";
@@ -305,7 +314,7 @@ el("logout").onclick = () => {
   sessionVersion++; client.logout(); el<HTMLInputElement>("token").value = ""; entries = []; media = [];
   renderEntries(); el("repo-count").textContent = "仓库尚未加载"; el("identity").textContent = "本地写作 · 尚未连接 GitHub";
   el<HTMLSelectElement>("media-select").replaceChildren(new Option("选择图片", ""));
-  el<HTMLInputElement>("media-file").value = ""; el("result").hidden = true; lastCommit = "";
+  clearMedia(); el("result").hidden = true; lastCommit = "";
   updateControls(); notice("已清除内存凭据并中止未完成的请求。本地文章草稿仍保留，可另行清空。已被 GitHub 接收的提交无法通过退出撤回。");
 };
 el("publish").onclick = () => void run(async () => {
@@ -315,7 +324,7 @@ el("publish").onclick = () => void run(async () => {
   if (!candidate.path) candidate.path = `src/content/${candidate.collection}/${candidate.id}.md`;
   await loadRepository();
   const errors = validateEntry(candidate, entries);
-  if (errors.length) throw new Error(`内容校验失败：\n${errors.join("\n")}`);
+  if (errors.length) { el<HTMLDetailsElement>("metadata-panel").open = true; throw new Error(`内容校验失败：\n${errors.join("\n")}`); }
   const publicText = candidate.data.draft ? "将以 draft: true 提交。网站不生成文章页，但 Markdown 源码在公开 GitHub 仓库中任何人都能读取。" : `将公开发布到 ${entryRoute(candidate)}。`;
   if (!await confirmAction("提交文章到 GitHub", `${publicText}\n\n文件：${candidate.path}\n提交后等待 Actions 构建部署。`)) return;
   const result = await client.writeFile(candidate.path, serializeEntry(candidate), candidate.sha || undefined);
@@ -356,16 +365,53 @@ function insertImage(path: string) {
   notice(`已插入 ${reference}。请填写图片说明；图片提交后须等待部署才能通过本站路径访问。`);
 }
 el("insert-media").onclick = () => { const path = el<HTMLSelectElement>("media-select").value; if (path) insertImage(path); };
+function clearMedia() {
+  pendingImage = undefined;
+  if (pendingImageUrl) URL.revokeObjectURL(pendingImageUrl);
+  pendingImageUrl = "";
+  el<HTMLInputElement>("media-file").value = "";
+  el<HTMLImageElement>("media-thumbnail").removeAttribute("src");
+  el("media-thumbnail").hidden = true; el("clear-media").hidden = true;
+  el("media-pending").textContent = "尚未选择图片";
+  updateControls();
+}
+function stageImage(file: File) {
+  if (busy) { notice("当前操作尚未完成，请稍后添加图片。", true); return; }
+  clearMedia(); validateImage(file);
+  pendingImage = file; pendingImageUrl = URL.createObjectURL(file);
+  el<HTMLImageElement>("media-thumbnail").src = pendingImageUrl;
+  el("media-thumbnail").hidden = false; el("clear-media").hidden = false;
+  el("media-pending").textContent = `${file.name || "粘贴图片"} · ${(file.size / 1024).toFixed(1)} KiB · 等待确认上传`;
+  el<HTMLDetailsElement>("media-panel").open = true;
+  updateControls();
+  notice(client.authenticated ? "图片已暂存，点击“上传并插入”确认公开上传；每次处理一张。" : "图片已暂存在此页面。连接 GitHub 并填写文章 ID 后可确认上传；目前没有发送图片。");
+}
+el("media-file").addEventListener("change", () => {
+  const file = el<HTMLInputElement>("media-file").files?.[0];
+  if (file) try { stageImage(file); } catch (error) { notice(message(error), true); }
+});
+el("clear-media").onclick = clearMedia;
+bindImageInput({
+  dropTargets: [el("writing-area"), el("media-dropzone")],
+  pasteTarget: document.querySelector<HTMLElement>(".editor-panel")!,
+  onFile: stageImage,
+  onError: error => { clearMedia(); notice(message(error), true); },
+});
+for (const target of [el("writing-area"), el("media-dropzone")]) {
+  target.addEventListener("dragenter", event => { if (Array.from(event.dataTransfer?.types ?? []).includes("Files")) target.dataset.dragging = "true"; });
+  target.addEventListener("dragleave", event => { if (!target.contains(event.relatedTarget as Node | null)) delete target.dataset.dragging; });
+  target.addEventListener("drop", () => { delete target.dataset.dragging; });
+}
 el("upload").onclick = () => void run(async () => {
-  syncFromForm(); const file = el<HTMLInputElement>("media-file").files?.[0];
+  syncFromForm(); const file = pendingImage;
   if (!file) throw new Error("请先选择图片。");
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(active.id)) throw new Error("请先填写有效的文章 ID，用于图片目录。");
-  if (!file.size || file.size > 5 * 1024 * 1024 || !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.type)) throw new Error("仅支持 5 MiB 以内的 PNG、JPEG、GIF、WebP 图片。");
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(active.id)) { el<HTMLDetailsElement>("metadata-panel").open = true; throw new Error("请先填写有效的文章 ID，用于图片目录。"); }
+  validateImage(file);
   const extension = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" }[file.type];
   const path = `public/images/${active.id}/${crypto.randomUUID()}.${extension}`;
   if (!await confirmAction("公开上传图片", `图片将立即提交到公开仓库：\n${path}\n本地草稿中的图片也会公开。确认上传？`)) return;
   const result = await client.uploadFile(path, new Uint8Array(await file.arrayBuffer()));
-  await showCommit(result, "图片"); insertImage(path); await persist(); el<HTMLInputElement>("media-file").value = ""; await loadRepository();
+  await showCommit(result, "图片"); insertImage(path); await persist(); clearMedia(); await loadRepository();
 });
 window.addEventListener("beforeunload", event => { if (dirty) event.preventDefault(); });
 window.addEventListener("pagehide", () => { client.logout(); el<HTMLInputElement>("token").value = ""; });
