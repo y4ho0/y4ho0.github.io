@@ -1,0 +1,27 @@
+---
+import { friends } from "../data/friends";
+---
+
+<section aria-labelledby="friend-links-title">
+  <h2 id="friend-links-title">友链</h2>
+  <ul class="friend-links">
+    {friends.map(friend => <li>
+      <a class="friend-link" href={friend.link} target="_blank" rel="noopener noreferrer">
+        <img src={friend.avatarUrl} alt="" width="64" height="64" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+        <span class="friend-copy"><strong>{friend.title}</strong>{friend.description && <span class="friend-description">{friend.description}</span>}</span>
+        <span aria-hidden="true">↗</span>
+      </a>
+    </li>)}
+  </ul>
+</section>
+
+<style>
+  .friend-links { display:grid; gap:1rem; list-style:none; padding:0; }
+  .friend-links > li { margin:0; }
+  .friend-link { display:grid; grid-template-columns:4rem minmax(0,1fr) auto; align-items:center; gap:1rem; padding:1rem; border:1px solid var(--color-border); border-radius:var(--radius-medium); background:var(--color-surface); color:var(--color-text); text-decoration:none; }
+  .friend-link:is(:hover,:focus-visible) { border-color:var(--color-action); background:var(--color-surface-raised); }
+  .friend-link img { display:block; width:4rem; height:4rem; margin:0; border-radius:50%; object-fit:cover; background:var(--color-surface-raised); }
+  .friend-copy { min-width:0; overflow-wrap:anywhere; }
+  .friend-description { display:block; margin-top:.25rem; color:var(--color-muted-readable); font-size:.9em; }
+  @media(max-width:480px) { .friend-link { gap:.75rem; padding:.8rem; grid-template-columns:3rem minmax(0,1fr) auto; } .friend-link img { width:3rem; height:3rem; } }
+</style>

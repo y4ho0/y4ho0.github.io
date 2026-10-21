@@ -61,6 +61,10 @@ Supported block names are `theorem`, `proof`, `definition`, `lemma`, `propositio
 
 The public site avoids personal identity, education, residence, contact, résumé, employment, competition, research, internship, and skill-rating information. Optional post-location metadata represents only an explicitly chosen publication location; it must not be used to infer or publish a home address. The About page documents only the site itself.
 
+## Friend links
+
+Friend links appear on `/about/`. Add or update entries in `src/data/friends.ts` using `title`, optional `description`, `avatarUrl`, and `link`. Cards follow the site's typography and light/dark theme.
+
 ## Deployment
 
 GitHub Actions builds and deploys the contents of `dist/` to GitHub Pages on pushes to `main`, manual runs, and the daily 00:10 Asia/Shanghai schedule. Pull requests run the same checks without uploading or deploying a production artifact. The workflow does not create automated commits or push generated quote state to Git.
