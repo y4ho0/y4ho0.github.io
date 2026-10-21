@@ -106,6 +106,26 @@ summary { cursor:pointer; padding:.45rem 0; font-size:.85rem; }
 details[open] > label { margin-top:.8rem; }
 .editor-toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:.5rem; margin-top:1rem; padding:.7rem 0; border-top:1px solid var(--color-border); }
 .editor-toolbar > div { display:flex; gap:.4rem; }
+.format-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:.45rem .75rem; padding:.65rem .7rem; border:1px solid var(--color-border); border-radius:.6rem; background:var(--color-surface-raised); margin-bottom:.7rem; }
+.format-group { display:flex; flex-wrap:wrap; align-items:center; gap:.25rem; min-width:0; }
+.format-toolbar button { min-height:2.2rem; padding:.35rem .55rem; background:transparent; border-color:transparent; font-size:.8rem; white-space:nowrap; }
+.format-toolbar button:is(:hover,:focus-visible) { background:var(--color-surface); border-color:var(--color-border); color:var(--color-action); }
+.format-toolbar select { width:auto; max-width:100%; min-height:2.2rem; margin:0; padding-block:.35rem; font-size:.8rem; }
+.shortcuts-dialog { width:52rem; max-width:calc(100vw - 2rem); padding:1.25rem; }
+#shortcuts-form { display:flex; flex-direction:column; max-height:calc(90dvh - 2.5rem); }
+#shortcuts-title { font-size:1.3rem; }
+#shortcut-help { margin:.1rem 0 1rem; }
+.shortcut-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.3rem 1.2rem; min-height:0; overflow:auto; }
+.shortcut-row { display:grid; grid-template-columns:4.5rem minmax(0,1fr) auto; gap:.4rem; align-items:center; border-bottom:1px solid var(--color-border); padding:.35rem 0; }
+.shortcut-row input { margin:0; padding:.5rem; font-size:.8rem; cursor:pointer; }
+.shortcut-row input[aria-invalid=true] { border-color:#b65a43; }
+.shortcut-row button { min-height:2.2rem; padding:.35rem .45rem; font-size:.75rem; }
+#shortcut-error { flex-shrink:0; min-height:1.4em; max-height:6rem; overflow:auto; margin:.7rem 0; white-space:pre-line; font-size:.8rem; color:var(--color-muted-readable); }
+#shortcut-error[data-error=true] { color:#973c30; }
+:root[data-theme=dark] #shortcut-error[data-error=true] { color:#efaa97; }
+.shortcut-actions,.shortcut-actions > div { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; }
+.shortcut-actions { flex-shrink:0; justify-content:space-between; }
+@media(max-width:640px) { .shortcut-grid { grid-template-columns:minmax(0,1fr); } .format-toolbar { padding:.5rem; gap:.4rem; } }
 #editor-tabs { display:flex; gap:.5rem; padding-bottom:.6rem; }
 .writing-area { --split:50%; display:grid; grid-template-columns:minmax(0,var(--split)) .6rem minmax(0,1fr); height:36rem; border:1px solid var(--color-border); border-radius:.4rem; overflow:hidden; }
 #edit-pane,#preview-pane { min-width:0; height:100%; overflow:hidden; }

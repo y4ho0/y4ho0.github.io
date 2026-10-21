@@ -139,6 +139,31 @@ async function actualGlyphFonts(page: Page, target: Locator) {
   }
 }
 
+async function selectWriting(page: Page, start: number, end = start, direction: "forward" | "backward" = "forward") {
+  await page.locator("#markdown").evaluate((element: HTMLTextAreaElement, selection) => {
+    element.focus();
+    element.setSelectionRange(selection.start, selection.end, selection.direction);
+  }, { start, end, direction });
+}
+
+const commandButton = (page: Page, command: string) => page.locator(`#format-toolbar button[data-command="${command}"]`);
+const shortcutInput = (page: Page, command: string) => page.locator(`#shortcuts-form input[data-shortcut-command="${command}"]`);
+
+async function openShortcuts(page: Page) {
+  await page.locator("#shortcut-settings").click();
+  await expect(page.locator("#shortcuts-dialog")).toBeVisible();
+}
+
+async function captureShortcut(page: Page, command: string, combination: string) {
+  await shortcutInput(page, command).focus();
+  await pressEditorKey(page, combination);
+}
+
+async function pressEditorKey(page: Page, combination: string) {
+  const primary = await page.evaluate(() => /Mac|iPhone|iPad/u.test(navigator.platform) ? "Meta" : "Control");
+  await page.keyboard.press(combination.replace(/^Mod(?=\+)/u, primary));
+}
+
 test("unauthenticated access and rejected tokens never enable repository writes", async ({ page }) => {
   const api = await mockGitHub(page);
   await openAdmin(page);
@@ -705,4 +730,273 @@ test("pasting images stages exact bytes while ordinary text paste keeps its defa
   expect(api.puts[0].path).toMatch(/^public\/images\/pasted-image\/[a-f0-9-]+\.png$/u);
   expect(Buffer.from(api.puts[0].body.content, "base64")).toEqual(PNG);
   await expect(page.locator("#markdown")).toHaveValue(`Existing text.\n![图片说明](${api.puts[0].path.replace(/^public/u, "")})`);
+});
+
+test("formatting toolbar changes the shared Markdown selection, updates preview and restores the resulting local draft", async ({ page }) => {
+  const api = await mockGitHub(page); await openAdmin(page);
+  const editor = page.locator("#markdown");
+  const preview = page.frameLocator("#preview");
+  await page.locator('[name="title"]').fill("工具栏写作草稿");
+  await editor.fill("插入："); await selectWriting(page, 3);
+  await commandButton(page, "bold").click(); await page.keyboard.insertText("新内容");
+  await expect(editor).toHaveValue("插入：**新内容**");
+  await expect(preview.locator("strong")).toHaveText("新内容");
+  await editor.fill("保留开头 选中内容 保留结尾");
+  await selectWriting(page, 5, 9, "backward");
+  await commandButton(page, "bold").click();
+  await expect(editor).toHaveValue("保留开头 **选中内容** 保留结尾");
+  await expect(preview.locator("strong")).toHaveText("选中内容");
+  await expect(editor).toBeFocused();
+  // Real editor operations must participate in the browser's undo/redo history.
+  await pressEditorKey(page, "Mod+z");
+  await expect(editor).toHaveValue("保留开头 选中内容 保留结尾");
+  await pressEditorKey(page, "Mod+Shift+z");
+  await expect(editor).toHaveValue("保留开头 **选中内容** 保留结尾");
+
+  const cases = [
+    { command: "italic", text: "强调内容", selector: "em" },
+    { command: "strike", text: "划去内容", selector: "del" },
+    { command: "inlineCode", text: "answer = 42", selector: "p code" },
+    { command: "codeBlock", text: "const answer = 42;", selector: "pre code" },
+    { command: "quote", text: "第一行引用\n第二行引用", selector: "blockquote" },
+    { command: "unordered", text: "第一项\n第二项", selector: "ul" },
+    { command: "ordered", text: "第一项\n第二项", selector: "ol" },
+    { command: "task", text: "第一项\n第二项", selector: "ul" },
+  ];
+  for (const example of cases) {
+    await editor.fill(example.text);
+    await selectWriting(page, 0, example.text.length);
+    await commandButton(page, example.command).click();
+    await expect(preview.locator(example.selector), example.command).toContainText(example.text.split("\n")[0]);
+    if (["unordered", "ordered", "task"].includes(example.command)) await expect(preview.locator("li")).toHaveCount(2);
+    if (example.command === "task") {
+      await expect(preview.locator("span.task-checkbox")).toHaveText(["☐", "☐"]);
+      await expect(preview.locator("input")).toHaveCount(0);
+    }
+    await expect(editor).toBeFocused();
+  }
+  await editor.fill("- [x] 已完成\n- [ ] 未完成");
+  await expect(preview.locator("span.task-checkbox")).toHaveText(["☑", "☐"]);
+  await expect(preview.getByRole("img", { name: "已完成", exact: true })).toHaveCount(1);
+  await expect(preview.getByRole("img", { name: "未完成", exact: true })).toHaveCount(1);
+  await expect(preview.locator("input")).toHaveCount(0);
+  await editor.fill("一节标题\n第二行正文"); await selectWriting(page, 0, 4);
+  await page.locator("#heading-level").selectOption("heading2");
+  await expect(editor).toHaveValue("## 一节标题\n第二行正文");
+  await expect(preview.getByRole("heading", { level: 2, name: "一节标题" })).toBeVisible();
+  await expect(page.locator("#heading-level")).toHaveValue("");
+  await editor.fill("链接文字"); await selectWriting(page, 0, 4);
+  await commandButton(page, "link").click();
+  await expect(preview.locator("a")).toHaveText("链接文字");
+  await expect(editor).toHaveValue(/^\[链接文字\]\([^)]+\)$/u);
+  await editor.fill("图片说明"); await selectWriting(page, 0, 4);
+  await commandButton(page, "image").click();
+  await expect(preview.locator("img")).toHaveAttribute("alt", "图片说明");
+  await expect(editor).toHaveValue(/^!\[图片说明\]\([^)]+\)$/u);
+  await editor.fill("x^2 + y^2"); await selectWriting(page, 0, 9);
+  await commandButton(page, "mathInline").click();
+  await expect(preview.locator(".katex")).toHaveCount(1);
+  await expect(preview.locator(".katex-display")).toHaveCount(0);
+  await editor.fill("\\frac{a}{b}"); await selectWriting(page, 0, 11);
+  await commandButton(page, "mathBlock").click();
+  await expect(preview.locator(".katex-display .mfrac")).toHaveCount(1);
+  await selectWriting(page, (await editor.inputValue()).length);
+  await commandButton(page, "table").click();
+  await expect(preview.locator("table")).toHaveCount(1);
+  await selectWriting(page, (await editor.inputValue()).length);
+  await commandButton(page, "hr").click();
+  await expect(preview.locator("hr")).toHaveCount(1);
+
+  const result = await editor.inputValue();
+  await page.locator("#save-draft").click();
+  await expect(page.locator("#notice")).toContainText("草稿已保存");
+  expect(await storedDocuments(page)).toContain("工具栏写作草稿");
+  expect(api.puts).toHaveLength(0);
+  await page.reload();
+  await page.locator("#draft-list button").filter({ hasText: "工具栏写作草稿" }).click();
+  await expect(editor).toHaveValue(result);
+  await expect(preview.locator("table")).toHaveCount(1);
+  await expect(preview.locator(".katex-display .mfrac")).toHaveCount(1);
+});
+
+test("default shortcuts format writing only and ignore metadata, token, repeated keys and IME composition", async ({ page }) => {
+  await mockGitHub(page); await openAdmin(page);
+  const editor = page.locator("#markdown");
+  const preview = page.frameLocator("#preview");
+  for (const example of [
+    { combination: "Mod+b", original: "粗体", expected: "**粗体**", selector: "strong" },
+    { combination: "Mod+i", original: "斜体", expected: "*斜体*", selector: "em" },
+    { combination: "Mod+k", original: "链接文字", expected: /^\[链接文字\]\([^)]+\)$/u, selector: "a" },
+  ]) {
+    await editor.fill(example.original); await selectWriting(page, 0, example.original.length);
+    await pressEditorKey(page, example.combination);
+    await expect(editor).toHaveValue(example.expected);
+    await expect(preview.locator(example.selector)).toContainText(example.original);
+  }
+  await editor.fill("x^2"); await selectWriting(page, 0, 3);
+  await pressEditorKey(page, "Mod+Alt+Shift+m");
+  await expect(preview.locator(".katex")).toHaveCount(1);
+  const unchanged = await editor.inputValue();
+  for (const target of [page.locator('[name="title"]'), page.locator("#token")]) {
+    await target.fill("metadata stays plain");
+    await target.focus(); await pressEditorKey(page, "Mod+a"); await pressEditorKey(page, "Mod+b");
+    await expect(target).toHaveValue("metadata stays plain");
+    await expect(editor).toHaveValue(unchanged);
+  }
+  await editor.fill("输入法正在组合"); await selectWriting(page, 0, 7);
+  const ignored = await editor.evaluate(element => {
+    const isMac = /Mac|iPhone|iPad/u.test(navigator.platform);
+    return [{ isComposing: true }, { repeat: true }].map(properties => {
+      const event = new KeyboardEvent("keydown", { key: "b", code: "KeyB", ctrlKey: !isMac, metaKey: isMac, bubbles: true, cancelable: true, ...properties });
+      element.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+  });
+  expect(ignored).toEqual([false, false]);
+  await expect(editor).toHaveValue("输入法正在组合");
+});
+
+test("custom shortcuts persist across reload, reject conflicts and reserved combinations, and can be cancelled, disabled and reset", async ({ page }) => {
+  // This case exercises Linux's physical Ctrl+Alt combination being converted
+  // to portable Mod bindings, which must also be safe on macOS.
+  await page.addInitScript(() => Object.defineProperty(navigator, "platform", { value: "Linux x86_64", configurable: true }));
+  const uncaught: string[] = [];
+  page.on("pageerror", error => uncaught.push(error.message));
+  await mockGitHub(page); await openAdmin(page);
+  const editor = page.locator("#markdown");
+  const dialog = page.locator("#shortcuts-dialog");
+  await editor.fill("定制键位"); await selectWriting(page, 0, 4);
+  await openShortcuts(page); await captureShortcut(page, "bold", "Mod+Alt+b");
+  await expect(shortcutInput(page, "bold")).toHaveValue("Mod+Alt+B");
+  await page.locator("#save-shortcuts").click(); await expect(dialog).toBeHidden();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("garden-admin-shortcuts")!))).toMatchObject({ version: 1, bindings: { bold: "Mod+Alt+B" } });
+  await selectWriting(page, 0, 4); await pressEditorKey(page, "Mod+Alt+b");
+  await expect(editor).toHaveValue("**定制键位**");
+  await page.locator("#save-draft").click(); await expect(page.locator("#notice")).toContainText("草稿已保存");
+  await page.reload(); await expect(page.locator("#entry-path")).toContainText("新文件 →");
+  await editor.fill("重载后生效"); await selectWriting(page, 0, 5);
+  await pressEditorKey(page, "Mod+Alt+b"); await expect(editor).toHaveValue("**重载后生效**");
+
+  await openShortcuts(page); await captureShortcut(page, "italic", "Mod+Alt+b");
+  await page.locator("#save-shortcuts").click();
+  await expect(dialog).toBeVisible(); await expect(page.locator("#shortcut-error")).not.toHaveText("");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("garden-admin-shortcuts")!).bindings.italic)).not.toBe("Mod+Alt+B");
+  await page.locator("#cancel-shortcuts").click(); await expect(dialog).toBeHidden();
+
+  await openShortcuts(page); await captureShortcut(page, "bold", "Mod+s");
+  await expect(page.locator("#shortcut-error")).not.toHaveText("");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("garden-admin-shortcuts")!).bindings.bold)).toBe("Mod+Alt+B");
+  await page.locator("#cancel-shortcuts").click();
+
+  await openShortcuts(page); await captureShortcut(page, "bold", "Mod+Alt+h");
+  await expect(page.locator("#shortcut-error")).toContainText("保留");
+  await expect(shortcutInput(page, "bold")).toHaveValue("Mod+Alt+B");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("garden-admin-shortcuts")!).bindings.bold)).toBe("Mod+Alt+B");
+  expect(uncaught).toEqual([]);
+  await page.locator("#cancel-shortcuts").click();
+
+  await openShortcuts(page); await captureShortcut(page, "bold", "Mod+Alt+p");
+  await page.locator("#cancel-shortcuts").click();
+  await editor.fill("取消不应用"); await selectWriting(page, 0, 5);
+  await pressEditorKey(page, "Mod+Alt+b"); await expect(editor).toHaveValue("**取消不应用**");
+  await openShortcuts(page); await shortcutInput(page, "bold").focus(); await page.keyboard.press("Backspace");
+  await page.locator("#save-shortcuts").click(); await expect(dialog).toBeHidden();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("garden-admin-shortcuts")!).bindings.bold)).toBe("");
+  await editor.fill("快捷键已禁用"); await selectWriting(page, 0, 6);
+  await pressEditorKey(page, "Mod+Alt+b"); await expect(editor).toHaveValue("快捷键已禁用");
+  await selectWriting(page, 0, 6);
+  await commandButton(page, "bold").click(); await expect(editor).toHaveValue("**快捷键已禁用**");
+
+  await openShortcuts(page); await page.locator("#reset-shortcuts").click();
+  await expect(shortcutInput(page, "bold")).toHaveValue("Mod+B");
+  await page.locator("#save-shortcuts").click(); await expect(dialog).toBeHidden();
+  await editor.fill("恢复默认"); await selectWriting(page, 0, 4);
+  await pressEditorKey(page, "Mod+b"); await expect(editor).toHaveValue("**恢复默认**");
+  expect(uncaught).toEqual([]);
+});
+
+test("formatting tools and shortcut settings fit narrow screens and preserve the shared editor position across tabs", async ({ page }) => {
+  await mockGitHub(page); await openAdmin(page);
+  const editor = page.locator("#markdown");
+  const content = Array.from({ length: 100 }, (_, index) => `Line ${index}: mobile writing`).join("\n");
+  await editor.fill(content); await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator("#writing-area")).toHaveAttribute("data-layout", "tabs");
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    const toolbar = await page.locator("#format-toolbar").evaluate(element => ({
+      visibleButtons: Array.from(element.querySelectorAll("button")).filter(button => button.getBoundingClientRect().width > 0).length,
+      overflow: document.documentElement.scrollWidth > innerWidth,
+    }));
+    expect(toolbar.visibleButtons).toBeGreaterThanOrEqual(15);
+    expect(toolbar.overflow, `${width}px formatting toolbar does not widen the page`).toBe(false);
+    await openShortcuts(page);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width}px shortcut dialog does not widen the page`).toBe(true);
+    const bounds = await page.locator("#shortcuts-dialog").boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    await expect(page.locator("#save-shortcuts")).toBeVisible();
+    await page.locator("#cancel-shortcuts").click();
+  }
+  await selectWriting(page, 100, 125, "backward"); await commandButton(page, "bold").click();
+  const before = await editor.evaluate((element: HTMLTextAreaElement) => {
+    (window as any).__formattedEditor = element; element.scrollTop = 450;
+    return { text: element.value, start: element.selectionStart, end: element.selectionEnd, direction: element.selectionDirection, scroll: element.scrollTop };
+  });
+  await page.locator("#tab-preview").click(); await expect(editor).toBeHidden(); await page.locator("#tab-edit").click();
+  expect(await editor.evaluate((element: HTMLTextAreaElement) => ({
+    sameNode: element === (window as any).__formattedEditor,
+    text: element.value, start: element.selectionStart, end: element.selectionEnd, direction: element.selectionDirection, scroll: element.scrollTop,
+  }))).toEqual({ sameNode: true, ...before });
+});
+
+test("macOS uses Command shortcuts, exposes matching hints and records portable Mod bindings", async ({ page }) => {
+  // Exercise the platform branch on Linux CI as well; native undo is tested
+  // separately using the actual operating system's primary modifier.
+  await page.addInitScript(() => Object.defineProperty(navigator, "platform", { value: "MacIntel", configurable: true }));
+  await mockGitHub(page); await openAdmin(page);
+  const editor = page.locator("#markdown");
+  await expect(commandButton(page, "bold")).toHaveAttribute("aria-keyshortcuts", "Meta+B");
+  await expect(commandButton(page, "bold")).toHaveAttribute("title", /⌘/u);
+  await editor.fill("macOS 文本"); await selectWriting(page, 0, 8);
+  await page.keyboard.press("Meta+b"); await expect(editor).toHaveValue("**macOS 文本**");
+  const controlIgnored = await editor.evaluate(element => {
+    const event = new KeyboardEvent("keydown", { key: "b", code: "KeyB", ctrlKey: true, bubbles: true, cancelable: true });
+    element.dispatchEvent(event); return !event.defaultPrevented;
+  });
+  expect(controlIgnored).toBe(true); await expect(editor).toHaveValue("**macOS 文本**");
+  await openShortcuts(page); await captureShortcut(page, "bold", "Mod+Alt+b");
+  await expect(shortcutInput(page, "bold")).toHaveValue("Mod+Alt+B");
+  await page.locator("#save-shortcuts").click(); await expect(page.locator("#shortcuts-dialog")).toBeHidden();
+  await editor.fill("Mac 定制"); await selectWriting(page, 0, 6);
+  await page.keyboard.press("Meta+Alt+b"); await expect(editor).toHaveValue("**Mac 定制**");
+});
+
+test("formatting a multi-paragraph selection keeps valid paragraph markup and toggles combined emphasis without losing neighboring text", async ({ page }) => {
+  await mockGitHub(page); await openAdmin(page);
+  const editor = page.locator("#markdown");
+  const preview = page.frameLocator("#preview");
+  const source = "开头保持\n\n第一段文字\n\n第二段文字\n\n结尾保持";
+  const bold = "开头保持\n\n**第一段文字**\n\n**第二段文字**\n\n结尾保持";
+  await editor.fill(source);
+  await selectWriting(page, source.indexOf("第一段"), source.indexOf("\n\n结尾保持"), "backward");
+  await commandButton(page, "bold").click();
+  await expect(editor).toHaveValue(bold);
+  await expect(preview.locator("strong")).toHaveText(["第一段文字", "第二段文字"]);
+  await expect(preview.locator("article > p")).toHaveCount(4);
+
+  // Use the selection left by the command, as a writer would, rather than
+  // selecting again. Both paragraphs must support a second inline format.
+  await commandButton(page, "italic").click();
+  await expect(editor).toHaveValue("开头保持\n\n***第一段文字***\n\n***第二段文字***\n\n结尾保持");
+  await expect(preview.locator("em")).toHaveText(["第一段文字", "第二段文字"]);
+  await expect(preview.locator("strong")).toHaveText(["第一段文字", "第二段文字"]);
+  await commandButton(page, "italic").click();
+  await expect(editor).toHaveValue(bold);
+  await expect(preview.locator("em")).toHaveCount(0);
+  await expect(preview.locator("strong")).toHaveCount(2);
+  await commandButton(page, "bold").click();
+  await expect(editor).toHaveValue(source);
+  await expect(preview.locator("strong,em")).toHaveCount(0);
+  await expect(preview.locator("article > p")).toHaveText(["开头保持", "第一段文字", "第二段文字", "结尾保持"]);
+  await expect(editor).toBeFocused();
 });

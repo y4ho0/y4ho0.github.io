@@ -8,6 +8,8 @@ import rehypeKatex from "rehype-katex";
 import rehypeHighlight from "rehype-highlight";
 import rehypeStringify from "rehype-stringify";
 import DOMPurify from "dompurify";
+import { visit } from "unist-util-visit";
+import type { Root } from "hast";
 import remarkContentBlocks from "../plugins/remark-content-blocks.mjs";
 import tokens from "../styles/tokens.css?inline";
 import prose from "../styles/prose.css?inline";
@@ -25,10 +27,24 @@ const katex = katexSource.replace(/src:[^;}]+/gu, source => {
   return font ? `src:url("${font}") format("woff2")` : "src:none";
 });
 
+// Keep task-list markers visible while continuing to forbid all input controls
+// in the sanitized, read-only preview.
+function taskMarkers() {
+  return (tree: Root) => {
+    visit(tree, "element", node => {
+      if (node.tagName !== "input" || node.properties.type !== "checkbox" || !node.properties.disabled) return;
+      const checked = Boolean(node.properties.checked);
+      node.tagName = "span";
+      node.properties = { className: ["task-checkbox"], role: "img", ariaLabel: checked ? "已完成" : "未完成" };
+      node.children = [{ type: "text", value: checked ? "☑" : "☐" }];
+    });
+  };
+}
+
 const processor = unified().use(remarkParse).use(remarkGfm).use(remarkMath).use(remarkDirective)
   .use(remarkContentBlocks).use(remarkRehype) // Raw HTML is deliberately discarded.
   .use(rehypeKatex, { trust: false, strict: "warn", output: "htmlAndMathml" })
-  .use(rehypeHighlight, { detect: false, ignoreMissing: true }).use(rehypeStringify);
+  .use(rehypeHighlight, { detect: false, ignoreMissing: true }).use(taskMarkers).use(rehypeStringify);
 
 export async function previewDocument(markdown: string): Promise<string> {
   const rendered = String(await processor.process(markdown));
