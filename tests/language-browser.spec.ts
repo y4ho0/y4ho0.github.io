@@ -1,8 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 
 type Language = "zh-CN" | "en";
-const englishAboutHeading = "A quiet place for public work";
-const chineseAboutHeading = "一个安静记录的地方";
+const englishAboutHeading = "About This Site";
+const chineseAboutHeading = "关于本站";
 const resultTitle = "原样文章 Mixed title";
 const resultDescription = "原始摘要 Original summary";
 

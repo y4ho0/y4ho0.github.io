@@ -48,7 +48,7 @@ The body font must not replace KaTeX's native math families or the code font.
 
 ## Preloaded interface subset
 
-`ui.woff2` adds one **55,404-byte** (54.1 KiB) face containing **212**
+`ui.woff2` adds one **55,368-byte** (54.1 KiB) face containing **209**
 codepoints: printable ASCII and the non-ASCII characters in the fixed header,
 mobile menu, footer, language/theme controls, and search dialog/interface.
 `src/styles/wenkai-ui.css` exposes the CSS alias `LXGW WenKai Screen UI` with the

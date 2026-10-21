@@ -1,9 +1,9 @@
 :root {
   color-scheme: light;
-  --font-display: "Source Serif 4", "Noto Serif SC", "Songti SC", STSong, serif;
+  --font-display: var(--font-body);
   --font-body: "LXGW WenKai Screen", "Noto Serif SC", "Songti SC", STSong, serif;
   --font-code: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  --font-cjk-serif: "Noto Serif SC", "Songti SC", STSong, serif;
+  --font-cjk-serif: var(--font-body);
   --color-background: #f4f0e6;
   --color-surface: #faf8f1;
   --color-surface-raised: #fffdf7;

@@ -9,7 +9,7 @@ const notes = byUpdatedDate((await getPublishedNotes()).filter((entry) => !entry
 
 <BaseLayout title="花园" titleEn="Garden" description="花园中独立生长的笔记。" descriptionEn="Standalone notes in the garden.">
   <section class="page-shell site-shell">
-    <header class="page-header"><p class="eyebrow"><UiText zh="花园" en="Garden" /></p><h1><UiText zh="持续生长的笔记" en="Notes in progress" /></h1><p><UiText zh="独立笔记准备好公开后，就会出现在这里。" en="Standalone notes appear here when they are ready to be public." /></p></header>
+    <header class="page-header"><h1><UiText zh="花园" en="Garden" /></h1></header>
     {notes.length > 0 ? <div class="content-grid">{notes.map((entry) => <ContentCard entry={entry} />)}</div> : <p class="empty-state"><UiText zh="暂时还没有公开笔记。" en="No public notes yet." /></p>}
   </section>
 </BaseLayout>

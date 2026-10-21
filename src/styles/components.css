@@ -150,10 +150,10 @@
 .eyebrow {
   margin: 0 0 var(--space-3);
   color: var(--color-secondary-text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.78rem;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -176,7 +176,7 @@
   font-size: clamp(2rem, 3.25vw, 2.8rem);
   font-weight: 400;
   letter-spacing: 0;
-  line-height: 1.17;
+  line-height: 1.38;
   text-wrap: pretty;
 }
 
@@ -262,8 +262,9 @@
   gap: var(--space-3);
   margin-top: var(--space-3);
   color: var(--color-muted-readable);
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.75rem;
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  line-height: 1.6;
   transition: opacity 360ms ease, transform 360ms ease;
 }
 
@@ -388,7 +389,7 @@
 
 .search-dialog__footer {
   margin: var(--space-5) 0 0;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   text-align: right;
 }
 
@@ -406,7 +407,7 @@
   display: block;
   margin-bottom: var(--space-2);
   color: var(--color-muted-readable);
-  font: 0.78rem ui-sans-serif, system-ui, sans-serif;
+  font: 0.9rem var(--font-ui);
 }
 
 .search-interface input {
@@ -417,14 +418,14 @@
   border-radius: var(--radius-medium);
   background: var(--color-surface);
   color: var(--color-text);
-  font: 1rem ui-sans-serif, system-ui, sans-serif;
+  font: 1rem var(--font-ui);
 }
 
 .search-status {
   min-height: 1.4rem;
   margin: var(--space-3) 0;
   color: var(--color-muted-readable);
-  font: 0.78rem ui-sans-serif, system-ui, sans-serif;
+  font: 0.9rem var(--font-ui);
 }
 
 .search-results {
@@ -494,8 +495,8 @@
   display: flex;
   justify-content: space-between;
   color: var(--color-muted-readable);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.7rem;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
   text-transform: uppercase;
 }
 
@@ -528,8 +529,8 @@
   border: 1px solid var(--color-border);
   border-radius: 999px;
   color: var(--color-muted-readable);
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.72rem;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
 }
 
 .breadcrumbs ol {
@@ -541,8 +542,8 @@
   margin: 0 0 var(--space-6);
   padding: 0;
   color: var(--color-muted-readable);
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.8rem;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
   list-style: none;
 }
 
@@ -556,8 +557,8 @@
   flex-wrap: wrap;
   gap: var(--space-5);
   margin-top: var(--space-5);
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.8rem;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
 }
 
 .article-meta div {
@@ -581,8 +582,8 @@
   padding-left: var(--space-4);
   border-left: 1px solid var(--color-border);
   color: var(--color-muted-readable);
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.78rem;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
 }
 
 .table-of-contents > p {
@@ -637,8 +638,8 @@
   display: grid;
   gap: var(--space-2);
   color: var(--color-muted-readable);
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.78rem;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
 }
 
 .archive-filters select {
@@ -660,7 +661,7 @@
   border-radius: 999px;
   background: var(--color-action);
   color: var(--color-background);
-  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-ui);
   text-decoration: none;
 }
 

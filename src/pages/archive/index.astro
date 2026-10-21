@@ -25,7 +25,7 @@ function courseId(entry: AnyContentEntry) {
 
 <BaseLayout title="归档" titleEn="Archive" description="筛选花园中所有公开内容。" descriptionEn="Filter all public garden content.">
   <section class="page-shell site-shell">
-    <header class="page-header"><p class="eyebrow"><UiText zh="归档" en="Archive" /></p><h1><UiText zh="所有公开内容" en="Everything public" /></h1><p><UiText zh="按类型、成长状态、标签、课程或年份筛选。" en="Filter by type, status, tag, course, or year." /></p></header>
+    <header class="page-header"><h1><UiText zh="归档" en="Archive" /></h1><p><UiText zh="按类型、成长状态、标签、课程或年份筛选。" en="Filter by type, status, tag, course, or year." /></p></header>
     {entries.length > 0 ? (
       <>
         <form class="archive-filters" {...uiAttrs({ "aria-label": { zh: "归档筛选", en: "Archive filters" } })}>
