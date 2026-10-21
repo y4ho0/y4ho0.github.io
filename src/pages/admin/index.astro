@@ -1,10 +1,12 @@
 ---
 import "../../styles/tokens.css";
 import "../../styles/base.css";
+import "../../styles/wenkai.css";
 import "../../admin/admin.css";
+import ThemeControl from "../../components/ThemeControl.astro";
 ---
 <!doctype html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN" data-theme="light" data-theme-preference="system">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
@@ -13,12 +15,14 @@ import "../../admin/admin.css";
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.github.com; img-src 'self' data: blob: https:; font-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'" />
     <link rel="canonical" href="https://y4ho0.github.io/admin/" />
     <link rel="icon" href="/favicon-32.png" />
+    <meta name="theme-color" content="#f4f0e6" />
+    <script is:inline src="/admin/theme-init.js"></script>
     <title>文章管理 · y4ho0's Garden</title>
   </head>
   <body data-pagefind-ignore>
     <header class="admin-header">
       <div><p class="eyebrow">Y4HO0'S GARDEN / WORKSPACE</p><h1>文章管理</h1></div>
-      <a href="/">返回博客 ↗</a>
+      <div class="admin-header-actions"><ThemeControl label="页面主题" labels={{ system: "跟随系统", light: "浅色", dark: "深色" }} /><a href="/">返回博客 ↗</a></div>
     </header>
     <main class="admin-main">
       <section class="panel auth-panel" aria-label="GitHub 认证">
@@ -58,7 +62,7 @@ import "../../admin/admin.css";
             <div class="field-row"><label>标签（逗号分隔）<input name="tags" /></label><label>成长状态<select name="status"><option value="seedling">seedling · 萌芽</option><option value="growing">growing · 成长</option><option value="evergreen">evergreen · 常青</option></select></label></div>
             <div class="field-row"><label>发布日期<input name="publishedAt" type="date" /></label><label>更新日期<input name="updatedAt" type="date" required /></label></div>
             <label id="course-field">关联课程<select name="course"><option value="">无课程</option></select><small>projects 必填。已有文章锁定课程以保留 URL。</small></label>
-            <div class="field-row"><label class="check"><input name="draft" type="checkbox" />GitHub 未发布文章（draft: true，源码公开）</label><label id="feed-field" class="check"><input name="feed" type="checkbox" />加入 RSS（仅 notes）</label></div>
+            <div class="publication-options"><label class="check"><input name="draft" type="checkbox" />GitHub 未发布文章（源码公开）</label><label id="feed-field" class="check"><input name="feed" type="checkbox" />加入 RSS（仅 notes）</label></div>
             <details><summary>关联文章与发帖地点</summary><label>关联文章（JSON 数组）<textarea name="related" rows="3" placeholder='[{"collection":"notes","entry":"example"}]'></textarea></label><label id="location-field">发帖地点（JSON 对象，可留空）<textarea name="location" rows="3" placeholder='{"region":"hangzhou","name":"Hangzhou","latitude":30.2741,"longitude":120.1551}'></textarea></label><p class="muted">相同 region 必须使用一致的名称和坐标。已有的其他 frontmatter 字段会保留。</p></details>
             </details>
           </form>

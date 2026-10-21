@@ -180,6 +180,161 @@ test("default layout keeps advanced metadata compact and collapses the library o
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
+test("admin controls use WenKai with roomy select arrows and preserve native selection on narrow screens", async ({ page }) => {
+  await mockGitHub(page); await openAdmin(page);
+  const typography = await page.evaluate(async () => {
+    await document.fonts.ready;
+    const samples = Array.from(document.querySelectorAll("body,header h1,label,button,input,select,option,summary,dialog,textarea:not(#markdown)"))
+      .map(element => ({
+        label: `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ""}${element.getAttribute("name") ? `[name=${element.getAttribute("name")}]` : ""}`,
+        family: getComputedStyle(element).fontFamily,
+      }));
+    const selectPadding = Array.from(document.querySelectorAll("select")).map(element => ({
+      label: element.id || element.name,
+      right: Number.parseFloat(getComputedStyle(element).paddingRight),
+    }));
+    return { samples, selectPadding, editorFamily: getComputedStyle(document.querySelector("#markdown")!).fontFamily };
+  });
+  for (const sample of typography.samples) expect(sample.family, sample.label).toContain("LXGW WenKai Screen");
+  for (const select of typography.selectPadding) expect(select.right, select.label).toBeGreaterThanOrEqual(40);
+  expect(typography.editorFamily).toMatch(/monospace/iu);
+  expect(typography.editorFamily).not.toContain("LXGW WenKai Screen");
+
+  const collection = page.locator('[name="collection"]');
+  await collection.focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(collection).toHaveValue("courses");
+  await expect(page.locator("#metadata-summary")).toContainText("courses");
+  await expect(page.locator("#entry-path")).toContainText("src/content/courses/");
+  await page.locator('[name="status"]').selectOption("evergreen");
+  await expect(page.locator("#metadata-summary")).toContainText("evergreen");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator("#writing-area")).toHaveAttribute("data-layout", "tabs");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(collection).toHaveValue("courses");
+  await expect(page.locator("#metadata-summary")).toContainText("courses · evergreen");
+  await collection.selectOption("notes");
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    const publication = await page.locator(".publication-options").evaluate(element => {
+      const labels = Array.from(element.querySelectorAll("label")).map(label => {
+        const bounds = label.getBoundingClientRect();
+        return { whiteSpace: getComputedStyle(label).whiteSpace, top: bounds.top, bottom: bounds.bottom };
+      });
+      return { labels, overflow: document.documentElement.scrollWidth > innerWidth };
+    });
+    expect(publication.labels).toHaveLength(2);
+    expect(publication.labels.every(label => label.whiteSpace === "nowrap"), `${width}px checkbox labels remain on one line`).toBe(true);
+    expect(publication.labels[1].top, `${width}px RSS option starts on the next row`).toBeGreaterThanOrEqual(publication.labels[0].bottom);
+    expect(publication.overflow, `${width}px page stays within the viewport`).toBe(false);
+  }
+});
+
+test("admin shares the homepage theme preference without disturbing writing or preview position", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await mockGitHub(page); await openAdmin(page);
+  const root = page.locator("html");
+  const theme = (value: string) => page.locator(`.admin-header [data-theme-value="${value}"]`);
+  await expect(root).toHaveAttribute("data-theme", "light");
+  await theme("light").click();
+  // CDP's color-scheme emulation overrides every frame, hiding native iframe
+  // inheritance. Clear it while verifying explicit user-selected themes.
+  await page.emulateMedia({ colorScheme: null });
+  const body = ["## Theme preview", "", "```js", "const answer = 42;", "```", "",
+    ...Array.from({ length: 100 }, (_, index) => `Paragraph ${index}: 保留写作与预览位置。\n`),
+  ].join("\n");
+  await page.locator("#markdown").fill(body);
+  const preview = page.frameLocator("#preview");
+  await expect(preview.getByRole("heading", { name: "Theme preview" })).toBeVisible();
+  await expect(preview.locator(".hljs-keyword")).toContainText("const");
+  await page.locator("#save-draft").click();
+  await expect(page.locator("#notice")).toContainText("草稿已保存");
+  const writing = await page.locator("#markdown").evaluate((element: HTMLTextAreaElement) => {
+    (window as any).__themeEditor = element;
+    element.focus(); element.setSelectionRange(120, 150, "backward"); element.scrollTop = 550;
+    return { start: element.selectionStart, end: element.selectionEnd, direction: element.selectionDirection, scroll: element.scrollTop };
+  });
+  expect(writing.scroll).toBeGreaterThan(0);
+  const previewScroll = await preview.locator("body").evaluate(() => {
+    document.scrollingElement!.scrollTop = 650;
+    return document.scrollingElement!.scrollTop;
+  });
+  expect(previewScroll).toBeGreaterThan(0);
+
+  await theme("dark").click();
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  await expect(root).toHaveAttribute("data-theme-preference", "dark");
+  await expect(theme("dark")).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => preview.locator("body").evaluate(() => matchMedia("(prefers-color-scheme: dark)").matches)).toBe(true);
+  const colors = await page.evaluate(() => {
+    const luminance = (value: string) => {
+      const [red, green, blue] = (value.match(/[\d.]+/gu) ?? []).slice(0, 3).map(Number);
+      return [red, green, blue].map(channel => {
+        const linear = channel / 255;
+        return linear <= .04045 ? linear / 12.92 : ((linear + .055) / 1.055) ** 2.4;
+      }).reduce((total, channel, index) => total + channel * [.2126, .7152, .0722][index], 0);
+    };
+    const select = document.querySelector<HTMLSelectElement>('[name="collection"]')!;
+    const fallback = getComputedStyle(select);
+    const supportsPicker = CSS.supports("appearance", "base-select");
+    const picker = supportsPicker ? getComputedStyle(select, "::picker(select)") : fallback;
+    return {
+      body: luminance(getComputedStyle(document.body).backgroundColor),
+      pickerBackground: luminance(picker.backgroundColor),
+      pickerContrast: (luminance(picker.color) + .05) / (luminance(picker.backgroundColor) + .05),
+      preference: localStorage.getItem("garden-theme"),
+    };
+  });
+  expect(colors.body).toBeLessThan(.1);
+  expect(colors.pickerBackground).toBeLessThan(.1);
+  expect(colors.pickerContrast).toBeGreaterThanOrEqual(4.5);
+  expect(colors.preference).toBe("dark");
+  const previewColors = await preview.locator(".hljs-keyword").evaluate(element => {
+    const rgb = (value: string) => (value.match(/[\d.]+/gu) ?? []).slice(0, 3).map(Number);
+    const luminance = (value: string) => rgb(value).map(channel => {
+      const linear = channel / 255;
+      return linear <= .04045 ? linear / 12.92 : ((linear + .055) / 1.055) ** 2.4;
+    }).reduce((total, channel, index) => total + channel * [.2126, .7152, .0722][index], 0);
+    const foreground = luminance(getComputedStyle(element).color);
+    const background = luminance(getComputedStyle(element.closest("pre")!).backgroundColor);
+    return { body: luminance(getComputedStyle(document.body).backgroundColor), contrast: (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05) };
+  });
+  expect(previewColors.body).toBeLessThan(.1);
+  expect(previewColors.contrast).toBeGreaterThanOrEqual(4.5);
+  await expect(page.locator("#markdown")).toHaveValue(body);
+  expect(await page.locator("#markdown").evaluate((element: HTMLTextAreaElement) => ({
+    sameNode: (window as any).__themeEditor === element,
+    start: element.selectionStart, end: element.selectionEnd, direction: element.selectionDirection, scroll: element.scrollTop,
+  }))).toEqual({ sameNode: true, ...writing });
+  expect(await preview.locator("body").evaluate(() => document.scrollingElement!.scrollTop)).toBe(previewScroll);
+
+  await page.reload();
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  await expect(theme("dark")).toHaveAttribute("aria-pressed", "true");
+  await page.goto("/");
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator('.site-nav [data-theme-value="dark"]')).toHaveAttribute("aria-pressed", "true");
+  await page.goto("/admin/");
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  await page.emulateMedia({ colorScheme: "light" });
+  await theme("system").click();
+  await expect(root).toHaveAttribute("data-theme-preference", "system");
+  await expect(root).toHaveAttribute("data-theme", "light");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect(root).toHaveAttribute("data-theme", "light");
+  await theme("light").click();
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(root).toHaveAttribute("data-theme", "light");
+  await expect(root).toHaveAttribute("data-theme-preference", "light");
+  await page.emulateMedia({ colorScheme: null });
+  await expect.poll(() => preview.locator("body").evaluate(() => matchMedia("(prefers-color-scheme: dark)").matches)).toBe(false);
+});
+
 test("local drafts recover after reload while token disappears from all browser stores", async ({ page }) => {
   const api = await mockGitHub(page);
   await openAdmin(page); await login(page);

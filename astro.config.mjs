@@ -12,6 +12,8 @@ export default defineConfig({
   // Pages serves public assets with CORS enabled. Match that for opaque preview
   // frames locally so self-hosted body fonts load without allowing frame scripts.
   server: { headers: { "Access-Control-Allow-Origin": "*" } },
+  // Admin's strict CSP permits self-hosted scripts, never automatic inline JS.
+  vite: { build: { assetsInlineLimit: (filePath) => filePath.endsWith(".js") ? false : undefined } },
   markdown: {
     processor: unified({
       remarkPlugins: [remarkMath, remarkDirective, remarkContentBlocks],

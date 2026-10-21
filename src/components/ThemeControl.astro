@@ -1,20 +1,28 @@
-<div class="theme-control" role="group" aria-label="Color theme">
-  <button type="button" data-theme-value="system" aria-pressed="true">System</button>
-  <button type="button" data-theme-value="light" aria-pressed="false">Light</button>
-  <button type="button" data-theme-value="dark" aria-pressed="false">Dark</button>
+---
+interface Props { labels?: { system: string; light: string; dark: string }; label?: string }
+const { labels = { system: "System", light: "Light", dark: "Dark" }, label = "Color theme" } = Astro.props;
+---
+<div class="theme-control" role="group" aria-label={label}>
+  <button type="button" data-theme-value="system" aria-pressed="true">{labels.system}</button>
+  <button type="button" data-theme-value="light" aria-pressed="false">{labels.light}</button>
+  <button type="button" data-theme-value="dark" aria-pressed="false">{labels.dark}</button>
 </div>
 
 <script>
   const storageKey = "garden-theme";
   const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-theme-value]"));
   const media = window.matchMedia("(prefers-color-scheme: dark)");
+  let currentPreference = "system";
 
   function readPreference() {
-    const value = localStorage.getItem(storageKey);
-    return value === "light" || value === "dark" ? value : "system";
+    try {
+      const value = localStorage.getItem(storageKey);
+      return value === "light" || value === "dark" ? value : "system";
+    } catch { return currentPreference; }
   }
 
   function applyTheme(preference: string) {
+    currentPreference = preference;
     const resolved = preference === "system" ? (media.matches ? "dark" : "light") : preference;
     document.documentElement.dataset.theme = resolved;
     document.documentElement.dataset.themePreference = preference;
@@ -29,14 +37,15 @@
   buttons.forEach((button) => {
     button.addEventListener("click", () => {
       const preference = button.dataset.themeValue ?? "system";
-      localStorage.setItem(storageKey, preference);
+      try { localStorage.setItem(storageKey, preference); } catch { /* Use this page's preference when storage is unavailable. */ }
       applyTheme(preference);
     });
   });
 
   media.addEventListener("change", () => {
-    if (readPreference() === "system") applyTheme("system");
+    if (currentPreference === "system") applyTheme("system");
   });
+  window.addEventListener("storage", (event) => { if (event.key === storageKey || event.key === null) applyTheme(readPreference()); });
 
   applyTheme(readPreference());
 </script>

@@ -26,7 +26,7 @@
 5. 打开 `/admin/`，将令牌粘贴到密码框，点击“连接 GitHub”。成功后加载文章与媒体；无效令牌或不能证明仓库写权限的凭据会被拒绝。
 6. 写作结束点击“退出并清除凭据”；必要时到 GitHub 撤销令牌。刷新、关闭页面也会丢失此页面的认证，需要重新连接。
 
-令牌仅存在当前页面的 JavaScript 内存中，不写入 localStorage、sessionStorage、IndexedDB、文章、URL、构建产物或仓库。localStorage 只保存布局偏好。每次上传、提交和删除前重新做身份及权限预检，最终仍由 GitHub 对实际写请求执行授权。
+令牌仅存在当前页面的 JavaScript 内存中，不写入 localStorage、sessionStorage、IndexedDB、文章、URL、构建产物或仓库。localStorage 只保存布局与主题偏好。每次上传、提交和删除前重新做身份及权限预检，最终仍由 GitHub 对实际写请求执行授权。
 
 权限预检同时要求账号的仓库 push 权限，以及仓库响应中只能在具备 Contents 读写权限时读取的合并设置；缺失时保守拒绝。此检查不能保证分支保护、规则集或后来撤销的权限允许提交。官方依据见[获取仓库](https://docs.github.com/en/rest/repos/repos#get-a-repository)。读取公开文件成功或响应头 `X-Accepted-GitHub-Permissions` 都不能单独证明令牌获得写权限；该响应头表示端点要求的权限，见[GitHub 排错说明](https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api#resource-not-accessible)。
 
@@ -65,6 +65,8 @@
 右上角点击“切换模式”后，使用“编辑”和“预览”标签显示完整宽度的相应区域。两种布局始终共享同一个正文 textarea 和文章状态；切换只改变显示方式，保留未保存内容、光标、选区和编辑滚动位置，不新建第二份编辑器。
 
 窄屏自动使用切换布局。恢复宽屏后会尽可能恢复之前选择；布局偏好保存于 localStorage，认证信息不会随之保存。
+
+顶部主题控件与主页共用“跟随系统 / 浅色 / 深色”设置和 `garden-theme` 偏好，切换或刷新后保持一致。后台界面、下拉菜单及实时预览都同步主题，代码使用对应的浅/深色高亮；主题切换不重新创建编辑器或预览，不改变选区和滚动位置。发布状态选项保持整行，空间不足时 RSS 选项整体移到下一行。
 
 ## 本地草稿、仓库草稿与公开发布
 
@@ -111,7 +113,7 @@
 
 博客正文和后台预览默认使用自托管的 **LXGW WenKai Screen v1.530（霞鹜文楷屏幕阅读版）**。官方以原版 Medium 的笔画粗度制作 Screen，但内部字重映射为 Regular / 400；没有对其另作假 Medium 加粗。字体由官方 TTF 生成 188 个 WOFF2 分片，按 `unicode-range` 加载所需字符，无需运行时 CDN。完整授权、来源校验和再生成命令见 `public/fonts/lxgw-wenkai-screen/README.md`，正常构建无需 Python 或字体生成工具。
 
-普通正文、标题、加粗、斜体、列表、表格、链接和引用使用文楷；行内代码、代码块、`kbd`、`samp` 明确使用等宽字体；公式保留 KaTeX 自带数学字体，避免正文规则覆盖公式字形度量。页面导航和后台操作控件保持原界面字体。浏览器测试同时检查字体加载状态与 Chromium 实际使用的字形来源，覆盖分式、矩阵、上下标和语法高亮。KaTeX 渲染器、CSS 和字体统一为 0.19.0，预览中的数学字体内嵌以避免隔离 iframe 的跨域字体回退。
+普通正文、标题、加粗、斜体、列表、表格、链接和引用使用文楷；后台页面标题、标签、输入框、按钮和下拉选项也统一使用文楷。Markdown 源码编辑器、行内代码、代码块、`kbd`、`samp` 明确使用等宽字体；公式保留 KaTeX 自带数学字体，避免正文规则覆盖公式字形度量。主页导航保持现有字体。下拉框保留原生键盘和表单行为，在支持可定制选择器的浏览器中显示统一圆角菜单；旧浏览器回退系统弹出菜单。浏览器测试同时检查字体加载状态与 Chromium 实际使用的字形来源，覆盖分式、矩阵、上下标和语法高亮。KaTeX 渲染器、CSS 和字体统一为 0.19.0，预览中的数学字体内嵌以避免隔离 iframe 的跨域字体回退。
 
 原始 HTML 在预览 Markdown 转换中禁用；生成的 HTML 再由 DOMPurify 净化，并在没有脚本权限的 sandbox iframe 内展示。公式使用 `trust: false`。不要把输入任意 HTML 后预览没有执行，理解成最终博客接受任意 HTML 都安全：公开构建仍采用仓库已有 Astro 管线，只发布可信 Markdown。
 
@@ -140,7 +142,7 @@ npm run test:browser
 
 `npm run build` 包含每日引言生成、Astro 生产构建、Pagefind 索引和产物内部链接验证。发布验收应覆盖：未登录、无效令牌、无写权限、新建与编辑、IndexedDB 恢复、提交结果、双栏实时预览、切换后的选区与滚动、手机窄屏、代码和公式、恶意 HTML、API 失败、并发冲突和生产构建。
 
-本次在 Node.js 24 验证：`npm test` 的 60 项测试通过（含临时目录中的真实 Astro 构建、五集合与引用、路由、公式、RSS 和 Sitemap）；`npm run check` 为零错误、零警告；完整 `npm run build` 通过，包括 Pagefind 和输出验证；15 项 Chromium 浏览器测试全部通过，包括实际字体、拖拽和粘贴上传。GitHub Actions 也会运行这些检查和浏览器测试，远端结果见 Pull Request 检查记录。
+本次在 Node.js 24 验证：`npm test` 的 60 项测试通过（含临时目录中的真实 Astro 构建、五集合与引用、路由、公式、RSS 和 Sitemap）；`npm run check` 为零错误、零警告；完整 `npm run build` 通过，包括 Pagefind 和输出验证。浏览器回归 17 项全部通过，包括实际字体、夜间模式、键盘选择、320px / 390px 复选框整项换行、拖拽和粘贴上传；远端结果见 Pull Request 检查记录。
 
 API 与浏览器测试使用模拟 GitHub 响应覆盖认证、写权限不足、新建、编辑、删除、媒体、失败、SHA 冲突和部署状态，不代表使用真实 fine-grained PAT 写入 main 或线上部署成功。已通过当前开发账号的只读仓库 API 确认权限预检所需字段；真实文章写入与线上部署须分别检查实际提交及 Actions。后台在 PR 合并并成功部署后才上线，最终远端验证结果见该 Pull Request 的检查记录。
 
