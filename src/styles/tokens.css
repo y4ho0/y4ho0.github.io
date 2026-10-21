@@ -45,6 +45,8 @@
   --space-8: 5rem;
 }
 
+/* Animated colors need fixed endpoints, rather than targeting another color
+   that is itself moving during the same palette transition. */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --color-background: #10151c;
@@ -62,9 +64,9 @@
   --color-clay: #ad7d65;
   --color-primary: var(--color-moss);
   --color-secondary: var(--color-clay);
-  --color-focus: var(--color-warm-amber);
-  --color-action: var(--color-moss);
-  --color-secondary-text: var(--color-warm-amber);
+  --color-focus: #bf9667;
+  --color-action: #83a18d;
+  --color-secondary-text: #bf9667;
   --canvas-color-a: #83a18d;
   --canvas-color-b: #829bb1;
   --canvas-color-c: #928bae;
@@ -93,9 +95,9 @@
     --color-clay: #ad7d65;
     --color-primary: var(--color-moss);
     --color-secondary: var(--color-clay);
-    --color-focus: var(--color-warm-amber);
-    --color-action: var(--color-moss);
-    --color-secondary-text: var(--color-warm-amber);
+    --color-focus: #bf9667;
+    --color-action: #83a18d;
+    --color-secondary-text: #bf9667;
     --canvas-color-a: #83a18d;
     --canvas-color-b: #829bb1;
     --canvas-color-c: #928bae;

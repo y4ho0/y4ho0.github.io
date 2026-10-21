@@ -8,6 +8,51 @@ async function expectSettled(page: Page, theme: "light" | "dark") {
   await expect(page.locator("html")).not.toHaveAttribute("data-theme-transition");
 }
 
+test("inherited text follows its parent through the palette change without a second flash", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
+  await page.goto("/");
+  await expectSettled(page, "light");
+
+  for (const theme of ["dark", "light"] as const) {
+    const frames = await page.evaluate(async target => {
+      const link = document.querySelector<HTMLElement>('.site-nav a[href="/garden/"]')!;
+      const footer = document.querySelector<HTMLElement>(".site-footer")!;
+      const pairs = [
+        [link, link.querySelector<HTMLElement>('.ui-text > [data-ui-lang="zh-CN"]')!],
+        [footer, footer.querySelector<HTMLElement>('.site-footer__mark .ui-text > [data-ui-lang="zh-CN"]')!],
+      ];
+      const rgb = (element: HTMLElement) => getComputedStyle(element).color.match(/[\d.]+/g)!.slice(0, 3).map(Number);
+      const samples: { elapsed: number; colors: { parent: number[]; text: number[] }[] }[] = [];
+      const start = performance.now();
+      document.querySelector<HTMLButtonElement>(`.site-nav [data-theme-value="${target}"]`)!.click();
+      await new Promise<void>(resolve => {
+        function sample(now: number) {
+          samples.push({ elapsed: now - start, colors: pairs.map(([parent, text]) => ({ parent: rgb(parent!), text: rgb(text!) })) });
+          if (now - start < 1200) requestAnimationFrame(sample);
+          else resolve();
+        }
+        requestAnimationFrame(sample);
+      });
+      return samples;
+    }, theme);
+
+    // These spans have no authored color: animation must preserve ordinary CSS
+    // inheritance instead of making each nested span chase its moving parent.
+    const inheritanceError = Math.max(...frames.flatMap(frame => frame.colors.flatMap(({ parent, text }) =>
+      parent.map((channel, index) => Math.abs(channel - text[index]!)),
+    )));
+    expect(inheritanceError, `${theme}: inherited text must track its parent on every frame`).toBeLessThanOrEqual(2);
+
+    const lateJumps = frames.slice(1).flatMap((frame, index) => {
+        const previous = frames[index]!;
+        if (frame.elapsed < 720 || frame.elapsed - previous.elapsed >= 80) return [];
+        return frame.colors.flatMap(({ text }, pair) => text.map((channel, index) => Math.abs(channel - previous.colors[pair]!.text[index]!)));
+      });
+    expect(Math.max(0, ...lateJumps), `${theme}: settled text must not jump when the transition ends`).toBeLessThanOrEqual(5);
+    await expectSettled(page, theme);
+  }
+});
+
 test("theme colors change gradually, accept rapid pointer changes and settle on the last choice", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
@@ -21,10 +66,11 @@ test("theme colors change gradually, accept rapid pointer changes and settle on 
   await expect.poll(() => page.locator("body").evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe("rgb(244, 240, 230)");
   const during = await page.locator("body").evaluate(element => {
     const style = getComputedStyle(element);
+    const motion = getComputedStyle(document.documentElement);
     return {
       background: style.backgroundColor,
-      durations: style.transitionDuration.split(",").map(value => parseFloat(value) * (value.trim().endsWith("ms") ? 1 : 1000)),
-      easing: style.transitionTimingFunction,
+      durations: motion.transitionDuration.split(",").map(value => parseFloat(value) * (value.trim().endsWith("ms") ? 1 : 1000)),
+      easing: motion.transitionTimingFunction,
     };
   });
   expect(during.background).not.toBe("rgb(16, 21, 28)");

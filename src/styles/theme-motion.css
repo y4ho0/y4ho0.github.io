@@ -1,12 +1,37 @@
-/* Ease the palette itself so links, controls and writing stay interactive.
-   The script enables this only after first paint; preview documents follow
-   their parent's color-scheme without scripts or rebuilding their contents. */
+/* Animate the shared palette once at the root. Independently transitioning
+   inherited text at every DOM level can retarget it when a parent's transition
+   finishes, creating a second flash. Registered colors keep descendants on the
+   same interpolated value. Older browsers fall back to an immediate palette.
+   https://www.w3.org/TR/css-properties-values-api-1/ */
+@property --color-background { syntax: "<color>"; inherits: true; initial-value: #f4f0e6; }
+@property --color-surface { syntax: "<color>"; inherits: true; initial-value: #faf8f1; }
+@property --color-surface-raised { syntax: "<color>"; inherits: true; initial-value: #fffdf7; }
+@property --color-code-surface { syntax: "<color>"; inherits: true; initial-value: #efebe1; }
+@property --color-text { syntax: "<color>"; inherits: true; initial-value: #20231f; }
+@property --color-muted { syntax: "<color>"; inherits: true; initial-value: #6e746b; }
+@property --color-muted-readable { syntax: "<color>"; inherits: true; initial-value: #696f66; }
+@property --color-border { syntax: "<color>"; inherits: true; initial-value: #d9d5c9; }
+@property --color-moss { syntax: "<color>"; inherits: true; initial-value: #71806a; }
+@property --color-dust-blue { syntax: "<color>"; inherits: true; initial-value: #6f7f91; }
+@property --color-warm-amber { syntax: "<color>"; inherits: true; initial-value: #9b754d; }
+@property --color-soft-violet { syntax: "<color>"; inherits: true; initial-value: #81758c; }
+@property --color-clay { syntax: "<color>"; inherits: true; initial-value: #a06f4f; }
+@property --color-focus { syntax: "<color>"; inherits: true; initial-value: #4d6548; }
+@property --color-action { syntax: "<color>"; inherits: true; initial-value: #596853; }
+@property --color-secondary-text { syntax: "<color>"; inherits: true; initial-value: #8a5638; }
+
 @media (prefers-reduced-motion: no-preference) {
   :root[data-theme-transition="colors"],
-  :root[data-theme-transition="colors"] :where(body, body *, body *::before, body *::after),
-  :root[data-theme-preview] :where(body, body *, body *::before, body *::after) {
-    transition-property: color, background-color, border-color, box-shadow, fill, stroke !important;
+  :root[data-theme-preview] {
+    transition-property: --color-background, --color-surface, --color-surface-raised, --color-code-surface, --color-text, --color-muted, --color-muted-readable, --color-border, --color-moss, --color-dust-blue, --color-warm-amber, --color-soft-violet, --color-clay, --color-focus, --color-action, --color-secondary-text !important;
     transition-duration: 720ms !important;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+
+  /* Do not ease the palette again in controls or inherited spans. The preview
+     uses the same rule without scripts or replacing its document. */
+  :root[data-theme-transition="colors"] :where(body, body *, body *::before, body *::after),
+  :root[data-theme-preview] :where(body, body *, body *::before, body *::after) {
+    transition: none !important;
   }
 }

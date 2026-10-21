@@ -50,9 +50,9 @@ const buttonAttrs = (value: "system" | "light" | "dark") => localized
     } else if (root.dataset.theme !== resolved) {
       window.clearTimeout(cleanupTimer);
       root.dataset.themeTransition = "colors";
-      // Establish the pre-change colors before updating the palette. Only color
-      // properties ease: controls, selection and writing remain interactive.
-      getComputedStyle(document.body).backgroundColor;
+      // Establish the old root palette before changing its shared color values.
+      // Descendants inherit one animation; inputs and writing stay interactive.
+      getComputedStyle(root).getPropertyValue("--color-background");
       cleanupTimer = window.setTimeout(() => { delete root.dataset.themeTransition; }, 800);
     }
     root.dataset.theme = resolved;
