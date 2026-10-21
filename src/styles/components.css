@@ -5,6 +5,7 @@
   border-bottom: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-background) 88%, transparent);
   backdrop-filter: blur(14px);
+  font-family: var(--font-ui);
   transition: background-color 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
 }
 
@@ -24,8 +25,8 @@
 }
 
 .wordmark {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.92rem;
+  font-family: var(--font-ui);
+  font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   text-decoration: none;
@@ -45,8 +46,9 @@
   min-height: 2.75rem;
   align-items: center;
   color: var(--color-muted-readable);
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.88rem;
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  white-space: nowrap;
   text-decoration: none;
 }
 
@@ -64,7 +66,7 @@
   background: var(--color-surface);
   color: var(--color-muted-readable);
   cursor: pointer;
-  font: 0.78rem ui-sans-serif, system-ui, sans-serif;
+  font: 1rem var(--font-ui);
 }
 
 .search-trigger:hover,
@@ -112,14 +114,18 @@
   background: transparent;
   color: var(--color-muted-readable);
   cursor: pointer;
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.75rem;
+  font-family: var(--font-ui);
+  font-size: 1rem;
   transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
 }
 
 .theme-control button svg { display: block; width: 18px; height: 18px; }
 
-.theme-control button[aria-pressed="true"] {
+/* Head initialization restores preferences before paint; static aria-pressed
+   defaults are synchronized later when the interactive module binds. */
+:root:is([data-theme-preference="system"], :not([data-theme-preference])) .theme-control button[data-theme-value="system"],
+:root[data-theme-preference="light"] .theme-control button[data-theme-value="light"],
+:root[data-theme-preference="dark"] .theme-control button[data-theme-value="dark"] {
   background: var(--color-action);
   color: var(--color-background);
 }
@@ -131,8 +137,8 @@
 .site-footer {
   border-top: 1px solid var(--color-border);
   color: var(--color-muted-readable);
-  font-family: var(--font-body);
-  font-size: 0.8rem;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
 }
 
 .site-footer__mark {
@@ -351,6 +357,7 @@
   border-radius: var(--radius-large);
   background: var(--color-surface-raised);
   color: var(--color-text);
+  font-family: var(--font-ui);
   box-shadow: 0 30px 90px rgb(0 0 0 / 28%);
 }
 
@@ -390,6 +397,10 @@
 }
 
 .search-dialog .search-interface { margin-top: var(--space-5); }
+
+.search-dialog :is(.search-interface label, .search-interface input, .search-status) {
+  font-family: var(--font-ui);
+}
 
 .search-interface label {
   display: block;
@@ -683,6 +694,8 @@
   border-radius: 999px;
   background: var(--color-surface);
   color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: 1rem;
 }
 
 .mobile-menu {
@@ -694,6 +707,7 @@
   border-radius: var(--radius-large);
   background: var(--color-surface-raised);
   color: var(--color-text);
+  font-family: var(--font-ui);
   box-shadow: 0 30px 90px rgb(0 0 0 / 28%);
 }
 
@@ -739,7 +753,8 @@
 .mobile-menu__header {
   padding-bottom: var(--space-4);
   border-bottom: 1px solid var(--color-border);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-ui);
+  font-size: 1rem;
   font-weight: 700;
 }
 
@@ -750,6 +765,8 @@
   border-radius: 999px;
   background: transparent;
   color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: 1rem;
 }
 
 .mobile-menu nav {
@@ -793,8 +810,8 @@
 .mobile-menu__theme {
   padding-top: var(--space-5);
   color: var(--color-muted-readable);
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.8rem;
+  font-family: var(--font-ui);
+  font-size: 1rem;
 }
 
 @media (max-width: 72rem) {
