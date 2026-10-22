@@ -37,8 +37,10 @@ const links = [
   const openButton = document.querySelector<HTMLButtonElement>(".mobile-menu-trigger");
   const closeButton = dialog?.querySelector<HTMLButtonElement>(".mobile-menu__close");
   const focusableSelector = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
+  let navigating = false;
   openButton?.addEventListener("click", () => {
     if (!dialog) return;
+    navigating = false;
     dialog.showModal();
     openButton.setAttribute("aria-expanded", "true");
     window.requestAnimationFrame(() => closeButton?.focus());
@@ -46,6 +48,14 @@ const links = [
   closeButton?.addEventListener("click", () => dialog?.close());
   dialog?.addEventListener("click", (event) => {
     if (event.target === dialog) dialog.close();
+    const link = (event.target as Element | null)?.closest<HTMLAnchorElement>("a[href]");
+    if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (link.hasAttribute("download") || (link.target && link.target !== "_self")) return;
+    if (link.origin !== location.origin) return;
+    // Close before the browser captures the outgoing page. Native navigation
+    // and modified-click behavior remain unchanged; no timer delays the link.
+    navigating = true;
+    dialog.close();
   });
   dialog?.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -67,6 +77,6 @@ const links = [
   });
   dialog?.addEventListener("close", () => {
     openButton?.setAttribute("aria-expanded", "false");
-    openButton?.focus();
+    if (!navigating) openButton?.focus();
   });
 </script>

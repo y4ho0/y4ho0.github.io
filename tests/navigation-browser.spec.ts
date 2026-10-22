@@ -3,6 +3,58 @@ import { test, expect, type Page } from "@playwright/test";
 type Preference = "system" | "light" | "dark";
 type Language = "zh-CN" | "en";
 
+interface NavigationProbe {
+  received: boolean;
+  transition: boolean;
+  phase: "none" | "pending" | "ready" | "finished" | "failed";
+  duration?: string;
+  headerAnimation?: string;
+  theme?: string;
+  language?: string;
+}
+
+async function observeNativeNavigation(page: Page) {
+  await page.addInitScript(() => {
+    const probe: NavigationProbe = { received: false, transition: false, phase: "none" };
+    (window as unknown as { navigationProbe: NavigationProbe }).navigationProbe = probe;
+    window.addEventListener("pagereveal", event => {
+      const transition = (event as Event & { viewTransition?: { ready: Promise<void>; finished: Promise<void> } }).viewTransition;
+      probe.received = true;
+      probe.transition = Boolean(transition);
+      if (!transition) return;
+      probe.phase = "pending";
+      void transition.ready.then(() => {
+        probe.phase = "ready";
+        probe.duration = getComputedStyle(document.documentElement, "::view-transition-new(root)").animationDuration;
+        probe.headerAnimation = getComputedStyle(document.documentElement, "::view-transition-new(site-header)").animationName;
+        probe.theme = document.documentElement.dataset.theme;
+        probe.language = document.documentElement.dataset.uiLanguage;
+      }, () => { probe.phase = "failed"; });
+      void transition.finished.then(() => {
+        if (probe.phase !== "failed") probe.phase = "finished";
+      });
+    });
+    window.addEventListener("pageswap", () => {
+      sessionStorage.setItem("test-outgoing-navigation", JSON.stringify({
+        path: location.pathname,
+        openMenu: Boolean(document.querySelector<HTMLDialogElement>("#mobile-menu")?.open),
+        scroll: scrollY,
+      }));
+    });
+  });
+}
+
+async function navigationProbe(page: Page) {
+  return page.evaluate(() => (window as unknown as { navigationProbe: NavigationProbe }).navigationProbe);
+}
+
+async function expectNativeFade(page: Page, theme: Preference, language: Language) {
+  await expect.poll(async () => (await navigationProbe(page)).phase).toBe("finished");
+  expect(await navigationProbe(page)).toMatchObject({
+    received: true, transition: true, duration: "0.22s", headerAnimation: "none", theme, language,
+  });
+}
+
 // The classic head bootstrap stays available, while the interactive modules
 // cannot repair server-rendered controls. This makes a brief navigation flash
 // observable for several real browser frames instead of racing fast local JS.
@@ -218,4 +270,92 @@ test("menu actions stay reachable in short windows, trap focus and lock backgrou
   await search.click();
   await expect(page).toHaveURL(/\/search\/$/);
   await expect(page.locator("[data-search-input]").filter({ visible: true })).toBeVisible();
+});
+
+test("public links use a native fade while preferences, search, history and header controls keep working", async ({ page }) => {
+  await observeNativeNavigation(page);
+  await page.emulateMedia({ reducedMotion: "no-preference", colorScheme: "light" });
+  await page.goto("/about/");
+  await page.locator('.site-nav [data-theme-value="dark"]').click();
+  await page.locator('.site-nav [data-language-value="en"]').click();
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme-transition");
+  await page.evaluate(() => window.scrollTo({ top: 350, behavior: "instant" }));
+  const previousScroll = await page.evaluate(() => scrollY);
+  expect(previousScroll).toBeGreaterThan(0);
+
+  await page.locator('.site-nav a[href="/archive/"]').click();
+  await expect(page).toHaveURL(/\/archive\/$/);
+  await expectNativeFade(page, "dark", "en");
+  await expectBoundPreference(page, ".site-nav", "dark", "en");
+  await page.locator(".search-trigger").click();
+  await expect(page.locator("#search-dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#search-dialog")).toBeHidden();
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/about\/$/);
+  await expectNativeFade(page, "dark", "en");
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeCloseTo(previousScroll, 0);
+  await page.goForward();
+  await expect(page).toHaveURL(/\/archive\/$/);
+  await expectNativeFade(page, "dark", "en");
+  await page.locator('.site-nav [data-language-value="zh-CN"]').click();
+  await page.locator('.site-nav a[href="/garden/"]').click();
+  await expectNativeFade(page, "dark", "zh-CN");
+  await expectBoundPreference(page, ".site-nav", "dark", "zh-CN");
+});
+
+test("mobile navigation closes before its outgoing snapshot and works again after a round trip", async ({ page }) => {
+  await observeNativeNavigation(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "no-preference", colorScheme: "light" });
+  await page.goto("/about/");
+  await page.locator(".mobile-menu-trigger").click();
+  await page.locator('#mobile-menu a[href="/archive/"]').click();
+  await expectNativeFade(page, "light", "zh-CN");
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("test-outgoing-navigation")!))).toMatchObject({ path: "/about/", openMenu: false });
+  await page.locator(".mobile-menu-trigger").click();
+  await expect(page.locator("#mobile-menu")).toBeVisible();
+  await page.locator(".mobile-menu__search-link").click();
+  await expect(page).toHaveURL(/\/search\/$/);
+  await expectNativeFade(page, "light", "zh-CN");
+  const searchInput = page.locator("[data-search-input]").filter({ visible: true });
+  await searchInput.fill("数字花园");
+  await expect(page.locator(".search-results a").filter({ visible: true }).first()).toBeVisible();
+  await page.goBack();
+  await expectNativeFade(page, "light", "zh-CN");
+  await expect(page.locator("#mobile-menu")).toBeHidden();
+  await page.locator(".mobile-menu-trigger").click();
+  await expect(page.locator("#mobile-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".mobile-menu-trigger")).toBeFocused();
+});
+
+test("reduced-motion navigation and the admin boundary do not start view transitions", async ({ page }) => {
+  await observeNativeNavigation(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/about/");
+  await page.locator('.site-nav a[href="/archive/"]').click();
+  await expect(page).toHaveURL(/\/archive\/$/);
+  await expect.poll(async () => (await navigationProbe(page)).received).toBe(true);
+  expect((await navigationProbe(page)).transition).toBe(false);
+
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  // Exercise a real same-origin link: page.goto alone cannot prove that the
+  // destination opts out, because address-bar navigations do not transition.
+  await page.evaluate(() => {
+    const link = document.createElement("a");
+    link.href = "/admin/";
+    link.id = "test-admin-link";
+    link.textContent = "Admin";
+    document.body.append(link);
+  });
+  await page.locator("#test-admin-link").click();
+  await expect(page).toHaveURL(/\/admin\/$/);
+  await expect.poll(async () => (await navigationProbe(page)).received).toBe(true);
+  expect((await navigationProbe(page)).transition).toBe(false);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/archive\/$/);
+  await expect.poll(async () => (await navigationProbe(page)).received).toBe(true);
+  expect((await navigationProbe(page)).transition).toBe(false);
 });

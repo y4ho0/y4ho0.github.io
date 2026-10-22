@@ -6,9 +6,9 @@ import { byUpdatedDate, getPublishedLabs } from "../../lib/content";
 const labs = byUpdatedDate(await getPublishedLabs());
 ---
 
-<BaseLayout title="实验" titleEn="Labs" description="记录小型实验的过程与结果。" descriptionEn="Small, documented experiments.">
+<BaseLayout title="实验" titleEn="Labs" description="随便做点什么" descriptionEn="Try a little something.">
   <section class="page-shell site-shell">
-    <header class="page-header"><h1><UiText zh="实验" en="Labs" /></h1></header>
+    <header class="page-header"><h1><UiText zh="实验" en="Labs" /></h1><p><UiText zh="随便做点什么" en="Try a little something." /></p></header>
     {labs.length > 0 ? <div class="content-grid">{labs.map((entry) => <ContentCard entry={entry} />)}</div> : <p class="empty-state"><UiText zh="暂时还没有公开实验。" en="No public labs yet." /></p>}
   </section>
 </BaseLayout>

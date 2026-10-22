@@ -69,9 +69,13 @@ On narrow screens, the menu puts the search icon directly to the left of Close, 
 
 Control highlights read the head-initialized language/theme preference directly, so full-page navigation does not briefly highlight the static System / Chinese defaults while modules load. A preloaded 54.1 KiB WenKai interface subset also avoids fallback-font replacement in fixed site chrome; the complete article font and code/math fonts stay separate. Browsers without registered CSS color properties still switch correctly, with an immediate palette change.
 
+Public-page links use native cross-document View Transitions: a 220ms eased fade keeps the header in place, with menus and search dialogs closed before the outgoing snapshot. This retains normal document initialization, history and scrolling without a client router. Reduced-motion users, unsupported browsers, reloads and the `/admin/` boundary keep ordinary navigation. Decorative homepage whitespace suppresses accidental word/paragraph selection from rapid repeated clicks; normal text selection remains available, and an existing selection no longer disables subsequent whitespace click effects.
+
 Language switching updates interface labels, page titles, descriptions, search messages, and date formatting without reloading the page. Article titles, summaries, Markdown, tags, place names, daily quotes, and friend profiles remain in their original language. URLs, content schemas, RSS and sitemap routes are unchanged. The management interface at `/admin/` continues to use Chinese.
 
 Static output and search indexing use the default Chinese interface plus original article content. The alternate English UI text is excluded from Pagefind so labels are not indexed twice. Search queries make CJK word boundaries explicit so Chinese search also works when Pagefind is first loaded in English mode; this does not translate queries or content. No translation service or runtime dependency is added. Without JavaScript, the public pages remain readable in Chinese.
+
+The globe uses the original COBE renderer and regular point distribution, with only a 7.5% reduction in dot count (9,250 / 13,875 samples). Its original palette, brightness, geographic texture, markers, dragging and keyboard controls are retained.
 
 ## Friend links
 

@@ -6,9 +6,9 @@ import { byUpdatedDate, getPublishedEssays } from "../../lib/content";
 const essays = byUpdatedDate(await getPublishedEssays());
 ---
 
-<BaseLayout title="随笔" titleEn="Essays" description="花园中沉淀下来的长篇思考。" descriptionEn="Longer-form writing from the garden.">
+<BaseLayout title="随笔" titleEn="Essays" description="随便写点什么" descriptionEn="Write a little something.">
   <section class="page-shell site-shell">
-    <header class="page-header"><h1><UiText zh="随笔" en="Essays" /></h1></header>
+    <header class="page-header"><h1><UiText zh="随笔" en="Essays" /></h1><p><UiText zh="随便写点什么" en="Write a little something." /></p></header>
     {essays.length > 0 ? <div class="content-grid">{essays.map((entry) => <ContentCard entry={entry} />)}</div> : <p class="empty-state"><UiText zh="暂时还没有公开随笔。" en="No public essays yet." /></p>}
   </section>
 </BaseLayout>

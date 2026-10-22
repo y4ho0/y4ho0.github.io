@@ -177,7 +177,8 @@ const globeLabelZh = locations.length > 0
         theta,
         dark: palette.dark,
         diffuse: 1.08,
-        mapSamples: size < 220 ? 10000 : 15000,
+        // Keep the original dot distribution, with only 7.5% fewer samples.
+        mapSamples: size < 220 ? 9250 : 13875,
         mapBrightness: palette.mapBrightness,
         mapBaseBrightness: palette.mapBaseBrightness,
         baseColor: palette.baseColor,
@@ -266,6 +267,27 @@ const globeLabelZh = locations.length > 0
       start();
     }
 
+    function onLoad() {
+      // COBE loads its land texture asynchronously. A static globe needs one
+      // more paint after page resources load, without starting an animation.
+      if (reducedMotion.matches) render(performance.now());
+    }
+
+    function onPageHide(event: PageTransitionEvent) {
+      if (!event.persisted) {
+        cleanup();
+        return;
+      }
+      // A bfcache restore reuses this document and does not run its scripts again.
+      // Keep the WebGL instance and interaction state; only pause animation.
+      window.cancelAnimationFrame(animationFrame);
+      root.dataset.globeState = "paused";
+    }
+
+    function onPageShow(event: PageTransitionEvent) {
+      if (event.persisted) start();
+    }
+
     const resizeObserver = new ResizeObserver(() => {
       const previousSize = size;
       measure();
@@ -282,7 +304,9 @@ const globeLabelZh = locations.length > 0
       themeObserver.disconnect();
       reducedMotion.removeEventListener("change", onMotionChange);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("pagehide", cleanup);
+      window.removeEventListener("load", onLoad);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("pageshow", onPageShow);
       document.removeEventListener("astro:before-swap", cleanup);
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
@@ -298,7 +322,9 @@ const globeLabelZh = locations.length > 0
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     reducedMotion.addEventListener("change", onMotionChange);
     document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("pagehide", cleanup);
+    window.addEventListener("load", onLoad, { once: true });
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("pageshow", onPageShow);
     document.addEventListener("astro:before-swap", cleanup);
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove, { passive: true });

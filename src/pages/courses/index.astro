@@ -6,9 +6,9 @@ import { byUpdatedDate, getPublishedCourses } from "../../lib/content";
 const courses = byUpdatedDate(await getPublishedCourses());
 ---
 
-<BaseLayout title="课程" titleEn="Courses" description="以课程为线索，串联笔记与实验。" descriptionEn="Course-shaped collections of connected notes and experiments.">
+<BaseLayout title="课程" titleEn="Courses" description="随便学点什么" descriptionEn="Learn a little something.">
   <section class="page-shell site-shell">
-    <header class="page-header"><h1><UiText zh="课程" en="Courses" /></h1><p><UiText zh="课程用于组织内容，不代表修读经历或学习进度。" en="Courses are structural containers, not claims of enrollment or progress." /></p></header>
+    <header class="page-header"><h1><UiText zh="课程" en="Courses" /></h1><p><UiText zh="随便学点什么" en="Learn a little something." /></p></header>
     {courses.length > 0 ? <div class="content-grid">{courses.map((entry) => <ContentCard entry={entry} />)}</div> : <p class="empty-state"><UiText zh="暂时还没有公开课程。" en="No public courses yet." /></p>}
   </section>
 </BaseLayout>

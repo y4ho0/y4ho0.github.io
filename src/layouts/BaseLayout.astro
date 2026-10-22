@@ -4,6 +4,7 @@ import Footer from "../components/Footer.astro";
 import UiText from "../components/UiText.astro";
 import { uiAttrs } from "../lib/ui-language";
 import "../styles/global.css";
+import "../styles/public-navigation.css";
 
 interface Props {
   title?: string;
@@ -68,6 +69,13 @@ const structuredData = type === "article"
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
+    <!-- Declare navigation participation before external styles load. -->
+    <style is:inline>
+      @view-transition { navigation: auto; }
+      @media (prefers-reduced-motion: reduce) {
+        @view-transition { navigation: none; }
+      }
+    </style>
     <script is:inline src="/ui-language-init.js"></script>
     <meta name="description" {...uiAttrs({ content: { zh: description, en: descriptionEn } })} />
     {noindex && <meta name="robots" content="noindex, nofollow" />}
@@ -122,5 +130,12 @@ const structuredData = type === "article"
     </main>
     <Footer />
     <script>import "../scripts/ui-language";</script>
+    <script>
+      // A search result or history navigation can leave a modal open until
+      // unload. Remove it before the native outgoing-page snapshot is taken.
+      window.addEventListener("pageswap", () => {
+        document.querySelectorAll<HTMLDialogElement>("dialog[open]").forEach(dialog => dialog.close());
+      });
+    </script>
   </body>
 </html>
