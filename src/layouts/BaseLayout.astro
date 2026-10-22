@@ -1,11 +1,16 @@
 ---
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
+import UiText from "../components/UiText.astro";
+import { uiAttrs } from "../lib/ui-language";
 import "../styles/global.css";
+import "../styles/public-navigation.css";
 
 interface Props {
   title?: string;
+  titleEn?: string;
   description?: string;
+  descriptionEn?: string;
   canonicalPath?: string;
   imagePath?: string;
   type?: "website" | "article";
@@ -16,7 +21,9 @@ interface Props {
 
 const {
   title = "y4ho0's Garden",
-  description = "A quiet digital garden for notes, experiments, projects, and essays.",
+  titleEn = title,
+  description = "一个安静记录笔记、实验、项目和随笔的数字花园。",
+  descriptionEn = Astro.props.description === undefined ? "A quiet digital garden for notes, experiments, projects, and essays." : description,
   canonicalPath = Astro.url.pathname,
   imagePath = "/og.png",
   type = "website",
@@ -25,6 +32,7 @@ const {
   noindex = false,
 } = Astro.props;
 const pageTitle = title === "y4ho0's Garden" ? title : `${title} · y4ho0's Garden`;
+const pageTitleEn = titleEn === "y4ho0's Garden" ? titleEn : `${titleEn} · y4ho0's Garden`;
 const canonical = new URL(canonicalPath, Astro.site);
 const socialImage = new URL(imagePath, Astro.site);
 const structuredData = type === "article"
@@ -57,37 +65,47 @@ const structuredData = type === "article"
 ---
 
 <!doctype html>
-<html lang="en" data-theme="light" data-theme-preference="system">
+<html lang="zh-CN" data-ui-language="zh-CN" data-theme="light" data-theme-preference="system">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
-    <meta name="description" content={description} />
+    <!-- Declare navigation participation before external styles load. -->
+    <style is:inline>
+      @view-transition { navigation: auto; }
+      @media (prefers-reduced-motion: reduce) {
+        @view-transition { navigation: none; }
+      }
+    </style>
+    <script is:inline src="/ui-language-init.js"></script>
+    <meta name="description" {...uiAttrs({ content: { zh: description, en: descriptionEn } })} />
     {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="canonical" href={canonical} />
     <meta property="og:site_name" content="y4ho0's Garden" />
-    <meta property="og:title" content={pageTitle} />
-    <meta property="og:description" content={description} />
+    <meta property="og:title" {...uiAttrs({ content: { zh: pageTitle, en: pageTitleEn } })} />
+    <meta property="og:description" {...uiAttrs({ content: { zh: description, en: descriptionEn } })} />
+    <meta property="og:locale" {...uiAttrs({ content: { zh: "zh_CN", en: "en_US" } })} />
     <meta property="og:type" content={type} />
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={socialImage} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="y4ho0's Garden, a quiet digital garden" />
+    <meta property="og:image:alt" {...uiAttrs({ content: { zh: "y4ho0 的数字花园", en: "y4ho0's Garden, a quiet digital garden" } })} />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content={pageTitle} />
-    <meta name="twitter:description" content={description} />
+    <meta name="twitter:title" {...uiAttrs({ content: { zh: pageTitle, en: pageTitleEn } })} />
+    <meta name="twitter:description" {...uiAttrs({ content: { zh: description, en: descriptionEn } })} />
     <meta name="twitter:image" content={socialImage} />
-    <meta name="twitter:image:alt" content="y4ho0's Garden, a quiet digital garden" />
+    <meta name="twitter:image:alt" {...uiAttrs({ content: { zh: "y4ho0 的数字花园", en: "y4ho0's Garden, a quiet digital garden" } })} />
     {publishedAt && <meta property="article:published_time" content={publishedAt.toISOString()} />}
     {updatedAt && <meta property="article:modified_time" content={updatedAt.toISOString()} />}
     <meta name="generator" content={Astro.generator} />
     <meta name="theme-color" content="#f4f0e6" />
-    <link rel="preload" href="/fonts/source-serif-4-regular.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="/fonts/lxgw-wenkai-screen/ui.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <script is:inline>
       (() => {
-        const stored = localStorage.getItem("garden-theme");
+        let stored = null;
+        try { stored = localStorage.getItem("garden-theme"); } catch { /* Follow the system if browser storage is unavailable. */ }
         const preference = stored === "light" || stored === "dark" ? stored : "system";
         const resolved = preference === "system"
           ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
@@ -98,11 +116,11 @@ const structuredData = type === "article"
         document.querySelector('meta[name="theme-color"]')?.setAttribute("content", color);
       })();
     </script>
-    <title>{pageTitle}</title>
+    <title data-ui-title-zh={pageTitle} data-ui-title-en={pageTitleEn}>{pageTitle}</title>
     <script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)}></script>
   </head>
   <body>
-    <a class="skip-link" href="#main-content">Skip to content</a>
+    <a class="skip-link" href="#main-content"><UiText zh="跳到正文" en="Skip to content" /></a>
     <Header />
     <main
       id="main-content"
@@ -111,5 +129,13 @@ const structuredData = type === "article"
       <slot />
     </main>
     <Footer />
+    <script>import "../scripts/ui-language";</script>
+    <script>
+      // A search result or history navigation can leave a modal open until
+      // unload. Remove it before the native outgoing-page snapshot is taken.
+      window.addEventListener("pageswap", () => {
+        document.querySelectorAll<HTMLDialogElement>("dialog[open]").forEach(dialog => dialog.close());
+      });
+    </script>
   </body>
 </html>

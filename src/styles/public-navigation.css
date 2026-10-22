@@ -1,0 +1,42 @@
+/* Native document navigation keeps each page's scripts and browser history
+   intact. Only the public layout imports this opt-in; the CMS stays separate.
+   Unsupported browsers keep ordinary navigation without a JS router. */
+@media (prefers-reduced-motion: no-preference) {
+  .site-header {
+    view-transition-name: site-header;
+  }
+
+  ::view-transition-group(root) {
+    animation-duration: 220ms;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  ::view-transition-old(root) {
+    animation: public-page-out 220ms cubic-bezier(0.4, 0, 0.2, 1) both;
+    mix-blend-mode: plus-lighter;
+  }
+
+  ::view-transition-new(root) {
+    animation: public-page-in 220ms cubic-bezier(0.4, 0, 0.2, 1) both;
+    mix-blend-mode: plus-lighter;
+  }
+
+  /* The same header stays visually in place while its active link updates.
+     Avoid fading two copies of its text, icons and preference controls. */
+  ::view-transition-group(site-header),
+  ::view-transition-new(site-header) {
+    animation: none;
+  }
+
+  ::view-transition-old(site-header) {
+    display: none;
+  }
+}
+
+@keyframes public-page-out {
+  to { opacity: 0; }
+}
+
+@keyframes public-page-in {
+  from { opacity: 0; }
+}

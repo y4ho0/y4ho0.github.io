@@ -1,28 +1,35 @@
 ---
 import ThemeControl from "./ThemeControl.astro";
+import LanguageControl from "./LanguageControl.astro";
+import SearchIcon from "./SearchIcon.astro";
+import UiText from "./UiText.astro";
+import { uiAttrs } from "../lib/ui-language";
 
 const pathname = Astro.url.pathname;
 const links = [
-  ["Garden", "/garden/"],
-  ["Courses", "/courses/"],
-  ["Labs", "/labs/"],
-  ["Essays", "/essays/"],
-  ["Archive", "/archive/"],
-  ["Search", "/search/"],
-  ["About", "/about/"],
+  ["花园", "Garden", "/garden/"],
+  ["课程", "Courses", "/courses/"],
+  ["实验", "Labs", "/labs/"],
+  ["随笔", "Essays", "/essays/"],
+  ["归档", "Archive", "/archive/"],
+  ["关于", "About", "/about/"],
 ] as const;
 ---
 
-<button class="mobile-menu-trigger" type="button" aria-haspopup="dialog" aria-controls="mobile-menu" aria-expanded="false">Menu</button>
+<button class="mobile-menu-trigger" type="button" aria-haspopup="dialog" aria-controls="mobile-menu" aria-expanded="false"><UiText zh="菜单" en="Menu" /></button>
 <dialog class="mobile-menu" id="mobile-menu" aria-labelledby="mobile-menu-title">
   <div class="mobile-menu__header">
-    <span id="mobile-menu-title">Explore the garden</span>
-    <button class="mobile-menu__close" type="button" aria-label="Close menu">Close</button>
+    <span id="mobile-menu-title"><UiText zh="逛逛花园" en="Explore the garden" /></span>
+    <div class="mobile-menu__actions">
+      <a class="mobile-menu__search-link" href="/search/" {...uiAttrs({ "aria-label": { zh: "搜索", en: "Search" }, title: { zh: "搜索", en: "Search" } })}><SearchIcon /></a>
+      <button class="mobile-menu__close" type="button" {...uiAttrs({ "aria-label": { zh: "关闭菜单", en: "Close menu" } })}><UiText zh="关闭" en="Close" /></button>
+    </div>
   </div>
-  <nav aria-label="Mobile navigation">
-    {links.map(([label, href]) => <a href={href} aria-current={pathname.startsWith(href) ? "page" : undefined}>{label}</a>)}
+  <nav {...uiAttrs({ "aria-label": { zh: "移动导航", en: "Mobile navigation" } })}>
+    {links.map(([zh, en, href]) => <a href={href} aria-current={pathname.startsWith(href) ? "page" : undefined}><UiText zh={zh} en={en} /></a>)}
   </nav>
-  <div class="mobile-menu__theme"><span>Theme</span><ThemeControl /></div>
+  <div class="mobile-menu__theme"><span><UiText zh="主题" en="Theme" /></span><ThemeControl localized /></div>
+  <div class="mobile-menu__theme"><span><UiText zh="语言" en="Language" /></span><LanguageControl /></div>
 </dialog>
 
 <script>
@@ -30,8 +37,10 @@ const links = [
   const openButton = document.querySelector<HTMLButtonElement>(".mobile-menu-trigger");
   const closeButton = dialog?.querySelector<HTMLButtonElement>(".mobile-menu__close");
   const focusableSelector = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
+  let navigating = false;
   openButton?.addEventListener("click", () => {
     if (!dialog) return;
+    navigating = false;
     dialog.showModal();
     openButton.setAttribute("aria-expanded", "true");
     window.requestAnimationFrame(() => closeButton?.focus());
@@ -39,6 +48,14 @@ const links = [
   closeButton?.addEventListener("click", () => dialog?.close());
   dialog?.addEventListener("click", (event) => {
     if (event.target === dialog) dialog.close();
+    const link = (event.target as Element | null)?.closest<HTMLAnchorElement>("a[href]");
+    if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (link.hasAttribute("download") || (link.target && link.target !== "_self")) return;
+    if (link.origin !== location.origin) return;
+    // Close before the browser captures the outgoing page. Native navigation
+    // and modified-click behavior remain unchanged; no timer delays the link.
+    navigating = true;
+    dialog.close();
   });
   dialog?.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -60,6 +77,6 @@ const links = [
   });
   dialog?.addEventListener("close", () => {
     openButton?.setAttribute("aria-expanded", "false");
-    openButton?.focus();
+    if (!navigating) openButton?.focus();
   });
 </script>

@@ -754,6 +754,7 @@
   function collectReadingZones(canvasBounds: DOMRect) {
     const zones: ReadingZone[] = [];
     const selectors = [
+      ".hero__inner > .eyebrow",
       ".daily-quote__sizer",
       ".daily-quote figcaption",
       ".hero__intro",
@@ -1255,7 +1256,7 @@
       context.save();
       context.globalAlpha = 0.48 * labelVisibility;
       context.fillStyle = colors[cloud.color % colors.length];
-      context.font = `650 ${narrowScreen.matches ? 7.8 : 8.8}px ui-sans-serif, system-ui, sans-serif`;
+      context.font = `400 ${narrowScreen.matches ? 10 : 11}px ${styles.getPropertyValue("--font-body").trim()}`;
       context.letterSpacing = narrowScreen.matches ? "0.06em" : "0.08em";
       context.textAlign = "center";
       context.textBaseline = "middle";

@@ -29,6 +29,8 @@ Content lives in Astro Content Collections under `src/content/`:
 
 Draft entries are validated but excluded from production routes, feeds, sitemaps, archives, and search.
 
+Browser-based article management is available at `/admin/`. See [后台使用与认证配置](ADMIN_GUIDE.md) for local drafts, GitHub publishing, editor layouts, security limits, and validation steps.
+
 Notes, labs, projects, and essays may opt into the homepage post-location map. The `region` key groups entries at the same place, so its name and coordinates must remain consistent:
 
 ```yaml
@@ -58,6 +60,26 @@ Supported block names are `theorem`, `proof`, `definition`, `lemma`, `propositio
 ## Privacy
 
 The public site avoids personal identity, education, residence, contact, résumé, employment, competition, research, internship, and skill-rating information. Optional post-location metadata represents only an explicitly chosen publication location; it must not be used to infer or publish a home address. The About page documents only the site itself.
+
+## Interface language
+
+Public pages default to Simplified Chinese. Use the **中文 / EN** control in the desktop header or mobile menu to switch to English; the preference is saved as `garden-language` in localStorage and applies across pages. The Yahoo wordmark and navigation align to the left; search uses a magnifying-glass icon and retains its keyboard shortcuts. 中文 / EN buttons have equal sizes, and ordinary site text, display headings, quotations, metadata, and the header/footer use LXGW WenKai Screen. Code and KaTeX retain their dedicated families. Landing pages use the section name as their main heading, with concise functional descriptions; quotation authors use 16px text. Theme controls use monitor / sun / moon icons with translated tooltips and accessible names. The shared palette eases once at the root over 720ms with a cubic-bezier curve, so nested text inherits the same current colors without a second animation or end-of-transition flash; controls remain interactive; reduced-motion preferences switch immediately.
+
+On narrow screens, the menu puts the search icon directly to the left of Close, with six section links in two columns (three in short landscape windows). Theme and language settings stay on single rows with at least 44px tap targets. The menu header stays reachable while its contents scroll; open menus and search dialogs lock background scrolling, and a stable scrollbar gutter avoids horizontal shifts. Homepage decorations also avoid the introductory label as well as the quotation and reading text.
+
+Control highlights read the head-initialized language/theme preference directly, so full-page navigation does not briefly highlight the static System / Chinese defaults while modules load. A preloaded 54.1 KiB WenKai interface subset also avoids fallback-font replacement in fixed site chrome; the complete article font and code/math fonts stay separate. Browsers without registered CSS color properties still switch correctly, with an immediate palette change.
+
+Public-page links use native cross-document View Transitions: a 220ms eased fade keeps the header in place, with menus and search dialogs closed before the outgoing snapshot. This retains normal document initialization, history and scrolling without a client router. Reduced-motion users, unsupported browsers, reloads and the `/admin/` boundary keep ordinary navigation. Decorative homepage whitespace suppresses accidental word/paragraph selection from rapid repeated clicks; normal text selection remains available, and an existing selection no longer disables subsequent whitespace click effects.
+
+Language switching updates interface labels, page titles, descriptions, search messages, and date formatting without reloading the page. Article titles, summaries, Markdown, tags, place names, daily quotes, and friend profiles remain in their original language. URLs, content schemas, RSS and sitemap routes are unchanged. The management interface at `/admin/` continues to use Chinese.
+
+Static output and search indexing use the default Chinese interface plus original article content. The alternate English UI text is excluded from Pagefind so labels are not indexed twice. Search queries make CJK word boundaries explicit so Chinese search also works when Pagefind is first loaded in English mode; this does not translate queries or content. No translation service or runtime dependency is added. Without JavaScript, the public pages remain readable in Chinese.
+
+The globe uses the original COBE renderer and regular point distribution, with only a 7.5% reduction in dot count (9,250 / 13,875 samples). Its original palette, brightness, geographic texture, markers, dragging and keyboard controls are retained.
+
+## Friend links
+
+Friend links appear on `/about/`. Add or update entries in `src/data/friends.ts` using `title`, optional `description`, `avatarUrl`, and `link`. Cards follow the site's typography and light/dark theme.
 
 ## Deployment
 

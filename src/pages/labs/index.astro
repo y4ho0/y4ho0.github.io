@@ -1,13 +1,14 @@
 ---
+import UiText from "../../components/UiText.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import ContentCard from "../../components/ContentCard.astro";
 import { byUpdatedDate, getPublishedLabs } from "../../lib/content";
 const labs = byUpdatedDate(await getPublishedLabs());
 ---
 
-<BaseLayout title="Labs" description="Small, documented experiments.">
+<BaseLayout title="实验" titleEn="Labs" description="随便做点什么" descriptionEn="Try a little something.">
   <section class="page-shell site-shell">
-    <header class="page-header"><p class="eyebrow">Labs</p><h1>Experiments, documented</h1><p>Labs appear only when a real experiment has been written up.</p></header>
-    {labs.length > 0 ? <div class="content-grid">{labs.map((entry) => <ContentCard entry={entry} />)}</div> : <p class="empty-state">No public labs yet.</p>}
+    <header class="page-header"><h1><UiText zh="实验" en="Labs" /></h1><p><UiText zh="随便做点什么" en="Try a little something." /></p></header>
+    {labs.length > 0 ? <div class="content-grid">{labs.map((entry) => <ContentCard entry={entry} />)}</div> : <p class="empty-state"><UiText zh="暂时还没有公开实验。" en="No public labs yet." /></p>}
   </section>
 </BaseLayout>

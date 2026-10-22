@@ -1,0 +1,7 @@
+---
+import { uiAttrs } from "../lib/ui-language";
+---
+<div class="language-control" role="group" {...uiAttrs({ "aria-label": { zh: "界面语言", en: "Interface language" } })}>
+  <button type="button" data-language-value="zh-CN" aria-pressed="true" {...uiAttrs({ "aria-label": { zh: "切换到中文", en: "Switch to Chinese" } })}>中文</button>
+  <button type="button" data-language-value="en" aria-pressed="false" {...uiAttrs({ "aria-label": { zh: "切换到英文", en: "Switch to English" } })}>EN</button>
+</div>

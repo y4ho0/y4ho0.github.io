@@ -1,13 +1,14 @@
 ---
+import UiText from "../../components/UiText.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import ContentCard from "../../components/ContentCard.astro";
 import { byUpdatedDate, getPublishedEssays } from "../../lib/content";
 const essays = byUpdatedDate(await getPublishedEssays());
 ---
 
-<BaseLayout title="Essays" description="Longer-form writing from the garden.">
+<BaseLayout title="随笔" titleEn="Essays" description="随便写点什么" descriptionEn="Write a little something.">
   <section class="page-shell site-shell">
-    <header class="page-header"><p class="eyebrow">Essays</p><h1>Longer thoughts</h1><p>Essays are listed here after publication.</p></header>
-    {essays.length > 0 ? <div class="content-grid">{essays.map((entry) => <ContentCard entry={entry} />)}</div> : <p class="empty-state">No public essays yet.</p>}
+    <header class="page-header"><h1><UiText zh="随笔" en="Essays" /></h1><p><UiText zh="随便写点什么" en="Write a little something." /></p></header>
+    {essays.length > 0 ? <div class="content-grid">{essays.map((entry) => <ContentCard entry={entry} />)}</div> : <p class="empty-state"><UiText zh="暂时还没有公开随笔。" en="No public essays yet." /></p>}
   </section>
 </BaseLayout>

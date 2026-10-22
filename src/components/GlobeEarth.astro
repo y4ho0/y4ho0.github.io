@@ -1,5 +1,7 @@
 ---
 import type { PostLocationFrequency } from "../lib/content";
+import UiText from "./UiText.astro";
+import { uiAttrs } from "../lib/ui-language";
 
 interface Props {
   locations?: PostLocationFrequency[];
@@ -10,6 +12,9 @@ const locatedPostCount = locations.reduce((total, location) => total + location.
 const globeLabel = locations.length > 0
   ? `Interactive rotating globe showing ${locatedPostCount} published entries across ${locations.length} locations`
   : "Interactive rotating globe ready to show locations from future published entries";
+const globeLabelZh = locations.length > 0
+  ? `可交互旋转地球：${locatedPostCount} 篇公开文章分布在 ${locations.length} 个地点`
+  : "可交互旋转地球，将显示未来公开文章的发帖地点";
 ---
 
 <div
@@ -21,7 +26,7 @@ const globeLabel = locations.length > 0
   data-globe-state="loading"
   data-no-click-effect
   role="img"
-  aria-label={globeLabel}
+  {...uiAttrs({ "aria-label": { zh: globeLabelZh, en: globeLabel } })}
   aria-describedby="globe-earth-description"
   tabindex="0"
 >
@@ -31,7 +36,7 @@ const globeLabel = locations.length > 0
     tabindex="-1"
   ></canvas>
   <span id="globe-earth-description" class="visually-hidden">
-    Marker size represents how many published entries carry that location. Drag the globe or use the arrow keys to adjust its direction.
+    <UiText zh="标记大小表示该地点的公开文章数量。拖动地球或使用方向键调整方向。" en="Marker size represents how many published entries carry that location. Drag the globe or use the arrow keys to adjust its direction." />
   </span>
 </div>
 
@@ -172,7 +177,8 @@ const globeLabel = locations.length > 0
         theta,
         dark: palette.dark,
         diffuse: 1.08,
-        mapSamples: size < 220 ? 10000 : 15000,
+        // Keep the original dot distribution, with only 7.5% fewer samples.
+        mapSamples: size < 220 ? 9250 : 13875,
         mapBrightness: palette.mapBrightness,
         mapBaseBrightness: palette.mapBaseBrightness,
         baseColor: palette.baseColor,
@@ -261,6 +267,27 @@ const globeLabel = locations.length > 0
       start();
     }
 
+    function onLoad() {
+      // COBE loads its land texture asynchronously. A static globe needs one
+      // more paint after page resources load, without starting an animation.
+      if (reducedMotion.matches) render(performance.now());
+    }
+
+    function onPageHide(event: PageTransitionEvent) {
+      if (!event.persisted) {
+        cleanup();
+        return;
+      }
+      // A bfcache restore reuses this document and does not run its scripts again.
+      // Keep the WebGL instance and interaction state; only pause animation.
+      window.cancelAnimationFrame(animationFrame);
+      root.dataset.globeState = "paused";
+    }
+
+    function onPageShow(event: PageTransitionEvent) {
+      if (event.persisted) start();
+    }
+
     const resizeObserver = new ResizeObserver(() => {
       const previousSize = size;
       measure();
@@ -277,7 +304,9 @@ const globeLabel = locations.length > 0
       themeObserver.disconnect();
       reducedMotion.removeEventListener("change", onMotionChange);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("pagehide", cleanup);
+      window.removeEventListener("load", onLoad);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("pageshow", onPageShow);
       document.removeEventListener("astro:before-swap", cleanup);
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
@@ -293,7 +322,9 @@ const globeLabel = locations.length > 0
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     reducedMotion.addEventListener("change", onMotionChange);
     document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("pagehide", cleanup);
+    window.addEventListener("load", onLoad, { once: true });
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("pageshow", onPageShow);
     document.addEventListener("astro:before-swap", cleanup);
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove, { passive: true });

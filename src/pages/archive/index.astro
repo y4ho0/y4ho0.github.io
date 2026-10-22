@@ -1,10 +1,14 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import UiText from "../../components/UiText.astro";
+import { uiAttrs } from "../../lib/ui-language";
 import ContentCard from "../../components/ContentCard.astro";
 import { byUpdatedDate, getAllPublished } from "../../lib/content";
 import { collectionLabel, type AnyContentEntry } from "../../lib/content-routing";
 
 const entries = byUpdatedDate(await getAllPublished());
+const collectionZh = { courses: "课程", notes: "笔记", labs: "实验", projects: "项目", essays: "随笔" };
+const statusLabels = { seedling: { zh: "萌芽", en: "Seedling" }, growing: { zh: "成长", en: "Growing" }, evergreen: { zh: "常青", en: "Evergreen" } };
 const types = [...new Set(entries.map((entry) => entry.collection))];
 const statuses = [...new Set(entries.map((entry) => entry.data.status))];
 const tags = [...new Set(entries.flatMap((entry) => entry.data.tags))].sort();
@@ -19,22 +23,22 @@ function courseId(entry: AnyContentEntry) {
 }
 ---
 
-<BaseLayout title="Archive" description="Filter all public garden content.">
+<BaseLayout title="归档" titleEn="Archive" description="筛选花园中所有公开内容。" descriptionEn="Filter all public garden content.">
   <section class="page-shell site-shell">
-    <header class="page-header"><p class="eyebrow">Archive</p><h1>Everything public</h1><p>Filter by type, status, tag, course, or year.</p></header>
+    <header class="page-header"><h1><UiText zh="归档" en="Archive" /></h1><p><UiText zh="按类型、成长状态、标签、课程或年份筛选。" en="Filter by type, status, tag, course, or year." /></p></header>
     {entries.length > 0 ? (
       <>
-        <form class="archive-filters" aria-label="Archive filters">
-          <label>Type<select name="type"><option value="">All types</option>{types.map((type) => <option value={type}>{collectionLabel(type)}</option>)}</select></label>
-          <label>Status<select name="status"><option value="">All statuses</option>{statuses.map((status) => <option value={status}>{status}</option>)}</select></label>
-          {tags.length > 0 && <label>Tag<select name="tag"><option value="">All tags</option>{tags.map((tag) => <option value={tag}>{tag}</option>)}</select></label>}
-          {courseOptions.length > 0 && <label>Course<select name="course"><option value="">All courses</option>{courseOptions.map((course) => <option value={course.id}>{course.title}</option>)}</select></label>}
-          {years.length > 0 && <label>Year<select name="year"><option value="">All years</option>{years.map((year) => <option value={String(year)}>{year}</option>)}</select></label>}
+        <form class="archive-filters" {...uiAttrs({ "aria-label": { zh: "归档筛选", en: "Archive filters" } })}>
+          <label><UiText zh="类型" en="Type" /><select name="type"><option value="" {...uiAttrs({ label: { zh: "全部类型", en: "All types" } })}>全部类型</option>{types.map((type) => <option value={type} {...uiAttrs({ label: { zh: collectionZh[type], en: collectionLabel(type) } })}>{collectionZh[type]}</option>)}</select></label>
+          <label><UiText zh="成长状态" en="Status" /><select name="status"><option value="" {...uiAttrs({ label: { zh: "全部状态", en: "All statuses" } })}>全部状态</option>{statuses.map((status) => <option value={status} {...uiAttrs({ label: statusLabels[status] })}>{statusLabels[status].zh}</option>)}</select></label>
+          {tags.length > 0 && <label><UiText zh="标签" en="Tag" /><select name="tag"><option value="" {...uiAttrs({ label: { zh: "全部标签", en: "All tags" } })}>全部标签</option>{tags.map((tag) => <option value={tag}>{tag}</option>)}</select></label>}
+          {courseOptions.length > 0 && <label><UiText zh="课程" en="Course" /><select name="course"><option value="" {...uiAttrs({ label: { zh: "全部课程", en: "All courses" } })}>全部课程</option>{courseOptions.map((course) => <option value={course.id}>{course.title}</option>)}</select></label>}
+          {years.length > 0 && <label><UiText zh="年份" en="Year" /><select name="year"><option value="" {...uiAttrs({ label: { zh: "全部年份", en: "All years" } })}>全部年份</option>{years.map((year) => <option value={String(year)}>{year}</option>)}</select></label>}
         </form>
         <div class="content-grid" data-archive-grid>{entries.map((entry) => <div data-type={entry.collection} data-status={entry.data.status} data-tags={JSON.stringify(entry.data.tags)} data-course={courseId(entry)} data-year={String((entry.data.publishedAt ?? entry.data.updatedAt).getFullYear())}><ContentCard entry={entry} /></div>)}</div>
-        <p class="empty-state" data-filter-empty hidden>No entries match these filters.</p>
+        <p class="empty-state" data-filter-empty hidden><UiText zh="没有符合当前筛选条件的内容。" en="No entries match these filters." /></p>
       </>
-    ) : <p class="empty-state">The archive is empty because no content has been published yet.</p>}
+    ) : <p class="empty-state"><UiText zh="还没有已发布的内容，归档暂时留白。" en="The archive is empty because no content has been published yet." /></p>}
   </section>
 </BaseLayout>
 

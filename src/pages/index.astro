@@ -1,5 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import UiText from "../components/UiText.astro";
+import { uiAttrs } from "../lib/ui-language";
 import AmbientClickEffects from "../components/AmbientClickEffects.astro";
 import ContentCard from "../components/ContentCard.astro";
 import DailyQuote from "../components/DailyQuote.astro";
@@ -18,28 +20,27 @@ const locatedPostCount = postLocations.reduce((total, location) => total + locat
   <section class="hero site-shell" aria-labelledby="home-title" data-click-effect-zone>
     <HomeCanvas />
     <div class="hero__inner">
-      <p class="eyebrow">A personal digital garden</p>
-      <h1 id="home-title" class="visually-hidden">y4ho0's Garden</h1>
+      <p class="eyebrow"><UiText zh="一座个人数字花园" en="A personal digital garden" /></p>
+      <h1 id="home-title" class="visually-hidden"><UiText zh="y4ho0 的花园" en="y4ho0's Garden" /></h1>
       <DailyQuote />
-      <p class="hero__intro">Notes, experiments, and essays grow here when they are ready. Empty beds are left empty on purpose.</p>
-      <a class="hero__link" href="/garden/">Enter the garden <span aria-hidden="true">↗</span></a>
+      <p class="hero__intro"><UiText zh="笔记、实验与随笔在这里慢慢生长。" en="Notes, experiments, and essays grow here when they are ready." /></p>
+      <a class="hero__link" href="/garden/"><UiText zh="走进花园" en="Enter the garden" /> <span aria-hidden="true">↗</span></a>
     </div>
   </section>
   <section class="home-globe-panel site-shell" aria-labelledby="home-globe-title" data-click-effect-zone>
     <div class="home-globe-panel__copy">
-      <p class="eyebrow">Post map</p>
-      <h2 id="home-globe-title">{postLocations.length > 0 ? `${locatedPostCount} located ${locatedPostCount === 1 ? "entry" : "entries"}.` : "A map ready for located posts."}</h2>
-      <p>{postLocations.length > 0 ? "Marker size reflects how often published entries were created at each location. Drag to look around; the globe resumes on its own." : "When a published note, lab, project, or essay opts into a location, it will appear here. No location data is fabricated."}</p>
-      {postLocations.length > 0 && <p class="home-globe-panel__places" aria-label="Post locations">
+      <h2 id="home-globe-title"><UiText zh="文章地图" en="Post map" /></h2>
+      <p><UiText zh={postLocations.length > 0 ? `${locatedPostCount} 篇文章标记了位置。标记大小表示文章数量；可以拖动查看。` : "公开的文章主动标记位置后，就会出现在这里；地图不会添加虚构坐标。"} en={postLocations.length > 0 ? `${locatedPostCount} ${locatedPostCount === 1 ? "article has" : "articles have"} a location. Marker size reflects article count; drag to look around.` : "When a published article opts into a location, it will appear here. No location data is fabricated."} /></p>
+      {postLocations.length > 0 && <p class="home-globe-panel__places" {...uiAttrs({ "aria-label": { zh: "文章位置", en: "Post locations" } })}>
         {postLocations.map((location) => <span>{location.name}<strong>{location.count}</strong></span>)}
       </p>}
     </div>
     <GlobeEarth locations={postLocations} />
   </section>
   <div class="home-sections site-shell">
-    {courses.length > 0 && <section class="home-section" aria-labelledby="home-courses"><header><p class="eyebrow">Paths</p><h2 id="home-courses">Courses</h2><a href="/courses/">View all</a></header><div class="content-grid">{courses.map((entry) => <ContentCard entry={entry} />)}</div></section>}
-    {labs.length > 0 && <section class="home-section" aria-labelledby="home-labs"><header><p class="eyebrow">Practice</p><h2 id="home-labs">Labs</h2><a href="/labs/">View all</a></header><div class="content-grid">{labs.map((entry) => <ContentCard entry={entry} />)}</div></section>}
-    {courses.length === 0 && labs.length === 0 && <section class="home-empty" aria-labelledby="home-empty-title"><DuckMark size="medium" label="A pixel-art white duck reclining on a peach pillow with one wing bent behind its head" /><div><p class="eyebrow">Current state</p><h2 id="home-empty-title">The beds are ready.</h2><p>Public course and lab cards will appear here when real material exists.</p></div></section>}
+    {courses.length > 0 && <section class="home-section" aria-labelledby="home-courses"><header><p class="eyebrow"><UiText zh="路径" en="Paths" /></p><h2 id="home-courses"><UiText zh="课程" en="Courses" /></h2><a href="/courses/"><UiText zh="查看全部" en="View all" /></a></header><div class="content-grid">{courses.map((entry) => <ContentCard entry={entry} />)}</div></section>}
+    {labs.length > 0 && <section class="home-section" aria-labelledby="home-labs"><header><p class="eyebrow"><UiText zh="实践" en="Practice" /></p><h2 id="home-labs"><UiText zh="实验" en="Labs" /></h2><a href="/labs/"><UiText zh="查看全部" en="View all" /></a></header><div class="content-grid">{labs.map((entry) => <ContentCard entry={entry} />)}</div></section>}
+    {courses.length === 0 && labs.length === 0 && <section class="home-empty" aria-labelledby="home-empty-title"><DuckMark size="medium" /><div><p class="eyebrow"><UiText zh="此刻" en="Current state" /></p><h2 id="home-empty-title"><UiText zh="没东西就是在偷懒。" en="Nothing here? I've been slacking." /></h2><p><UiText zh="有了真实内容，公开的课程与实验就会出现在这里。" en="Public course and lab cards will appear here when real material exists." /></p></div></section>}
   </div>
   <AmbientClickEffects />
 </BaseLayout>

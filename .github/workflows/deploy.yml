@@ -32,7 +32,7 @@ jobs:
       - name: Check Astro, TypeScript, and content references
         run: npm run check
 
-      - name: Test daily quote recovery and fallback behavior
+      - name: Test content, CMS safety, and daily quote recovery
         run: npm test
 
       - name: Generate or recover the daily quote
@@ -46,6 +46,12 @@ jobs:
 
       - name: Verify critical output and internal links
         run: npm run build:verify
+
+      - name: Install browser for CMS regression tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Test CMS in a production browser
+        run: npm run test:browser
 
       - name: Configure GitHub Pages
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

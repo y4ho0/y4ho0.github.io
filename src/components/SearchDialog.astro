@@ -1,17 +1,20 @@
 ---
 import SearchInterface from "./SearchInterface.astro";
+import SearchIcon from "./SearchIcon.astro";
+import UiText from "./UiText.astro";
+import { uiAttrs } from "../lib/ui-language";
 ---
 
-<button class="search-trigger" type="button" aria-haspopup="dialog" aria-controls="search-dialog" aria-expanded="false" data-search-open>
-  <span>Search</span><kbd aria-hidden="true">⌘K</kbd>
+<button class="search-trigger" type="button" aria-haspopup="dialog" aria-controls="search-dialog" aria-expanded="false" data-search-open {...uiAttrs({ "aria-label": { zh: "搜索", en: "Search" }, title: { zh: "搜索（⌘ / Ctrl + K）", en: "Search (⌘ / Ctrl + K)" } })}>
+  <SearchIcon />
 </button>
 <dialog class="search-dialog" id="search-dialog" aria-labelledby="search-dialog-title">
   <div class="search-dialog__header">
-    <h2 id="search-dialog-title">Search the garden</h2>
-    <button type="button" class="search-dialog__close" aria-label="Close search">Close</button>
+    <h2 id="search-dialog-title"><UiText zh="搜索博客" en="Search the garden" /></h2>
+    <button type="button" class="search-dialog__close" {...uiAttrs({ "aria-label": { zh: "关闭搜索", en: "Close search" } })}><UiText zh="关闭" en="Close" /></button>
   </div>
   <SearchInterface />
-  <p class="search-dialog__footer"><a href="/search/">Open the full search page</a></p>
+  <p class="search-dialog__footer"><a href="/search/"><UiText zh="打开完整搜索页" en="Open the full search page" /></a></p>
 </dialog>
 
 <script>

@@ -17,6 +17,7 @@ for (const required of [
   "index.html",
   "404.html",
   "search/index.html",
+  "admin/index.html",
   "rss.xml",
   "sitemap.xml",
   "robots.txt",
@@ -61,6 +62,11 @@ for (const file of htmlFiles) {
   if (inlineScriptBytes > 30_000) errors.push(`${relativeFile} has ${inlineScriptBytes} bytes of inline module JavaScript`);
   if (relativeFile !== "index.html" && html.includes("home-canvas")) errors.push(`${relativeFile} loads the home canvas`);
   if (relativeFile === "404.html" && !html.includes('name="robots" content="noindex, nofollow"')) errors.push("404.html is indexable");
+  if (relativeFile === "admin/index.html") {
+    if (!html.includes('name="robots" content="noindex, nofollow"')) errors.push("admin is indexable");
+    if (!html.includes('http-equiv="Content-Security-Policy"')) errors.push("admin has no content security policy");
+    if (html.includes("data-pagefind-body")) errors.push("admin is included in the article search body");
+  }
   const canonicalMatches = [...html.matchAll(/<link\s+rel="canonical"\s+href="([^"]+)"/gu)];
   if (canonicalMatches.length !== 1) {
     errors.push(`${relativeFile} has ${canonicalMatches.length} canonical links`);
@@ -86,6 +92,7 @@ for (const file of htmlFiles) {
 const sitemap = await readFile(path.join(dist, "sitemap.xml"), "utf8");
 if (!sitemap.includes("<urlset") || sitemap.includes("sitemapindex")) errors.push("sitemap.xml is not a single URL set");
 if (sitemap.includes("/404")) errors.push("sitemap.xml includes the 404 page");
+if (sitemap.includes("/admin/")) errors.push("sitemap.xml includes the admin page");
 
 const rss = await readFile(path.join(dist, "rss.xml"), "utf8");
 if (!rss.includes("<rss") || !rss.includes("<channel>")) errors.push("rss.xml is invalid");

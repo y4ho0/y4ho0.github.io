@@ -1,0 +1,10 @@
+.ui-text > [data-ui-lang="en"] { display:none; }
+:root[data-ui-language="en"] .ui-text > [data-ui-lang="zh-CN"] { display:none; }
+:root[data-ui-language="en"] .ui-text > [data-ui-lang="en"] { display:initial; }
+.language-control { display:inline-flex; align-items:center; gap:.15rem; padding:.2rem; border:1px solid var(--color-border); border-radius:999px; background:var(--color-surface); }
+.language-control button { display:grid; place-items:center; flex:0 0 2.75rem; inline-size:2.75rem; block-size:2.5rem; min-height:2.5rem; padding:0; border:0; border-radius:999px; background:transparent; color:var(--color-muted-readable); font-family:var(--font-ui); font-size:.95rem; cursor:pointer; }
+.language-control button:hover { color:var(--color-text); }
+/* Paint the saved language even while the deferred module has not bound yet. */
+:root:is([data-ui-language="zh-CN"], :not([data-ui-language])) .language-control button[data-language-value="zh-CN"],
+:root[data-ui-language="en"] .language-control button[data-language-value="en"] { color:var(--color-background); background:var(--color-action); }
+.mobile-menu__language { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-top:1rem; }

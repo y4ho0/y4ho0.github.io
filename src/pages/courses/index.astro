@@ -1,13 +1,14 @@
 ---
+import UiText from "../../components/UiText.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import ContentCard from "../../components/ContentCard.astro";
 import { byUpdatedDate, getPublishedCourses } from "../../lib/content";
 const courses = byUpdatedDate(await getPublishedCourses());
 ---
 
-<BaseLayout title="Courses" description="Course-shaped collections of connected notes and experiments.">
+<BaseLayout title="课程" titleEn="Courses" description="随便学点什么" descriptionEn="Learn a little something.">
   <section class="page-shell site-shell">
-    <header class="page-header"><p class="eyebrow">Courses</p><h1>Connected paths</h1><p>Courses are structural containers, not claims of enrollment or progress.</p></header>
-    {courses.length > 0 ? <div class="content-grid">{courses.map((entry) => <ContentCard entry={entry} />)}</div> : <p class="empty-state">No public courses yet.</p>}
+    <header class="page-header"><h1><UiText zh="课程" en="Courses" /></h1><p><UiText zh="随便学点什么" en="Learn a little something." /></p></header>
+    {courses.length > 0 ? <div class="content-grid">{courses.map((entry) => <ContentCard entry={entry} />)}</div> : <p class="empty-state"><UiText zh="暂时还没有公开课程。" en="No public courses yet." /></p>}
   </section>
 </BaseLayout>

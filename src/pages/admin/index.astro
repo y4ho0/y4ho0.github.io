@@ -1,0 +1,122 @@
+---
+import "../../styles/tokens.css";
+import "../../styles/base.css";
+import "../../styles/wenkai.css";
+import "../../admin/admin.css";
+import ThemeControl from "../../components/ThemeControl.astro";
+import { COMMANDS } from "../../admin/markdown-commands";
+const toolGroups = [
+  [["bold", "加粗"], ["italic", "斜体"], ["strike", "删除线"]],
+  [["quote", "引用"], ["unordered", "无序列表"], ["ordered", "有序列表"], ["task", "任务列表"]],
+  [["inlineCode", "行内代码"], ["codeBlock", "代码块"]],
+  [["link", "链接"], ["image", "图片"], ["table", "表格"], ["hr", "分割线"]],
+  [["mathInline", "行内公式"], ["mathBlock", "公式块"]],
+];
+---
+<!doctype html>
+<html lang="zh-CN" data-theme="light" data-theme-preference="system">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.github.com; img-src 'self' data: blob: https:; font-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <link rel="canonical" href="https://y4ho0.github.io/admin/" />
+    <link rel="icon" href="/favicon-32.png" />
+    <meta name="theme-color" content="#f4f0e6" />
+    <script is:inline src="/admin/theme-init.js"></script>
+    <title>文章管理 · y4ho0's Garden</title>
+  </head>
+  <body data-pagefind-ignore>
+    <header class="admin-header">
+      <div><p class="eyebrow">Y4HO0'S GARDEN / WORKSPACE</p><h1>文章管理</h1></div>
+      <div class="admin-header-actions"><ThemeControl label="页面主题" labels={{ system: "跟随系统", light: "浅色", dark: "深色" }} /><a href="/">返回博客 ↗</a></div>
+    </header>
+    <main class="admin-main">
+      <section class="panel auth-panel" aria-label="GitHub 认证">
+        <div><strong id="identity">本地写作 · 尚未连接 GitHub</strong><p>令牌只保存在此页面内存。刷新或退出即清除。公开仓库里的草稿和图片仍然公开。</p></div>
+        <form id="login-form">
+          <label for="token">Fine-grained PAT</label>
+          <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="仅目标仓库 · Contents: Read and write" required />
+          <button type="submit">连接 GitHub</button>
+        </form>
+        <button id="logout" hidden>退出并清除凭据</button>
+        <details class="security-help"><summary>认证配置与安全说明</summary><p>在 GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens 新建短期令牌。Resource owner 选择 y4ho0，Only select repositories 仅选择 y4ho0.github.io，Repository permissions 仅开启 Contents: Read and write（Metadata 自动只读）。账号也必须有仓库写权限。不要将令牌写入文章、URL 或代码。</p><p>静态网页无法保护令牌免受浏览器扩展、设备上的恶意软件或本站其他页面脚本的影响。仅在可信设备使用，用完退出并按需在 GitHub 撤销。IndexedDB 草稿未加密、只在本浏览器可恢复；它不等于备份。</p></details>
+      </section>
+      <p id="notice" role="status" aria-live="polite">可以离线写作并保存本地草稿。连接 GitHub 后加载仓库文章及媒体。</p>
+      <div id="result" class="panel" hidden><span id="result-text"></span> <a id="commit-link" target="_blank" rel="noopener noreferrer">查看提交 ↗</a> <button id="check-deploy">检查部署</button> <span id="deploy-status"></span></div>
+      <div class="workspace">
+        <aside class="library panel">
+          <details id="library-panel" open>
+          <summary class="library-summary">文章库与本地草稿</summary>
+          <div class="section-top"><h2>文章库</h2><button id="refresh" disabled>刷新仓库</button></div>
+          <label for="collection-filter">内容集合 / 分类</label><select id="collection-filter"><option value="">全部集合</option><option>courses</option><option>notes</option><option>labs</option><option>projects</option><option>essays</option></select>
+          <label for="search">搜索标题</label><input id="search" type="search" placeholder="按标题筛选" />
+          <button id="new-entry" class="primary wide">＋ 新建文章</button>
+          <p id="repo-count" class="muted">仓库尚未加载</p><ul id="entry-list" class="item-list"></ul>
+          <h2>本地草稿</h2><p class="muted">仅保存在此浏览器，不会提交 GitHub。输入后自动保存，也可手动保存。</p><ul id="draft-list" class="item-list"></ul>
+          <button id="clear-drafts">清空全部本地草稿</button>
+          </details>
+        </aside>
+        <section class="editor-panel panel" aria-label="文章编辑">
+          <div class="section-top"><div><h2 id="editor-heading">新建文章</h2><p id="entry-path" class="muted">尚未提交 GitHub</p></div><span id="save-state">本地草稿</span></div>
+          <form id="metadata" class="metadata" autocomplete="off">
+            <div class="metadata-primary">
+            <label>标题<input name="title" required /></label>
+            <label>摘要<textarea name="description" rows="1" required></textarea></label>
+            </div>
+            <details id="metadata-panel" class="metadata-settings"><summary>文章设置 <span id="metadata-summary">集合、标签、日期与关联</span></summary>
+            <div class="field-row"><label>内容集合 / 分类<select name="collection"><option>notes</option><option>courses</option><option>labs</option><option>projects</option><option>essays</option></select></label><label>文章 ID<input name="id" placeholder="例如 linear-algebra" pattern="[a-z0-9]+(-[a-z0-9]+)*" required /></label></div>
+            <div class="field-row"><label>标签（逗号分隔）<input name="tags" /></label><label>成长状态<select name="status"><option value="seedling">seedling · 萌芽</option><option value="growing">growing · 成长</option><option value="evergreen">evergreen · 常青</option></select></label></div>
+            <div class="field-row"><label>发布日期<input name="publishedAt" type="date" /></label><label>更新日期<input name="updatedAt" type="date" required /></label></div>
+            <label id="course-field">关联课程<select name="course"><option value="">无课程</option></select><small>projects 必填。已有文章锁定课程以保留 URL。</small></label>
+            <div class="publication-options"><label class="check"><input name="draft" type="checkbox" />GitHub 未发布文章（源码公开）</label><label id="feed-field" class="check"><input name="feed" type="checkbox" />加入 RSS（仅 notes）</label></div>
+            <details><summary>关联文章与发帖地点</summary><label>关联文章（JSON 数组）<textarea name="related" rows="3" placeholder='[{"collection":"notes","entry":"example"}]'></textarea></label><label id="location-field">发帖地点（JSON 对象，可留空）<textarea name="location" rows="3" placeholder='{"region":"hangzhou","name":"Hangzhou","latitude":30.2741,"longitude":120.1551}'></textarea></label><p class="muted">相同 region 必须使用一致的名称和坐标。已有的其他 frontmatter 字段会保留。</p></details>
+            </details>
+          </form>
+          <div class="editor-toolbar"><strong>Markdown</strong><div role="group" aria-label="布局与快捷键"><button id="shortcut-settings" type="button">快捷键</button><button id="layout-split" aria-pressed="false">左右对照</button><button id="layout-tabs" aria-pressed="false">切换模式</button></div></div>
+          <div id="format-toolbar" class="format-toolbar" role="group" aria-label="Markdown 格式工具">
+            <div class="format-group">
+              <label class="sr-only" for="heading-level">正文标题级别</label>
+              <select id="heading-level" title="正文标题级别；文章题目请填写上方标题字段"><option value="">标题级别</option>{[2, 3, 4, 5, 6].map(level => <option value={`heading${level}`}>{["一", "二", "三", "四", "五", "六"][level - 1]}级标题{level === 2 ? " · 推荐" : ""}</option>)}</select>
+              {toolGroups[0].map(([id, label]) => <button type="button" data-command={id}>{label}</button>)}
+            </div>
+            {toolGroups.slice(1).map(group => <div class="format-group">{group.map(([id, label]) => <button type="button" data-command={id}>{label}</button>)}</div>)}
+          </div>
+          <div id="editor-tabs" role="tablist" aria-label="编辑或预览"><button id="tab-edit" role="tab" aria-controls="edit-pane" aria-selected="true">编辑</button><button id="tab-preview" role="tab" aria-controls="preview-pane" aria-selected="false">预览</button></div>
+          <div id="writing-area" class="writing-area" data-layout="split" data-tab="edit">
+            <div id="edit-pane"><label class="sr-only" for="markdown">Markdown 正文</label><textarea id="markdown" spellcheck="false" placeholder="从 ## 标题开始写作…"></textarea></div>
+            <div id="splitter" role="separator" tabindex="0" aria-label="调整编辑器宽度" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="50"></div>
+            <div id="preview-pane"><iframe id="preview" title="文章实时预览" sandbox="" referrerpolicy="no-referrer"></iframe></div>
+          </div>
+          <p class="muted preview-help">文章页及列表的标题取自上方“标题”字段，正文通常从二级标题开始。工具作用于光标或选区，悬停可查看快捷键。支持 GFM、代码高亮、KaTeX 与语义块；预览禁用原始 HTML，高亮与最终 Shiki 有细微差异。</p>
+          <div class="actions"><button id="save-draft">保存本地草稿</button><button id="export">导出 Markdown</button><button id="publish" class="primary" disabled>提交到 GitHub</button><button id="delete-entry" class="danger" disabled>删除仓库文章</button></div>
+          <details id="media-panel"><summary>媒体管理 · 拖拽 / 粘贴 / 选择图片</summary><p class="muted">确认上传后会立即提交到公开仓库，与文章发布独立。支持 PNG / JPEG / GIF / WebP，最多 5 MiB。每次处理一张图片；多张仅取第一张。图片放在 public/images/文章ID/。</p>
+            <div id="media-dropzone" class="media-dropzone" tabindex="0" role="region" aria-label="图片拖拽与粘贴区域">
+              <strong>拖拽图片到这里，或在编辑区粘贴图片</strong><span>⌘ / Ctrl + V · 也可以选择文件</span>
+              <label>选择图片<input id="media-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" /></label>
+            </div>
+            <div class="media-staged"><img id="media-thumbnail" alt="待上传图片预览" hidden /><p id="media-pending" class="muted" aria-live="polite">尚未选择图片</p><button id="clear-media" hidden>清除所选图片</button></div>
+            <button id="upload" disabled>上传并插入</button><label for="media-select">已上传图片</label><select id="media-select"><option value="">选择图片</option></select><button id="insert-media" disabled>插入所选图片</button>
+          </details>
+        </section>
+      </div>
+    </main>
+    <dialog id="confirm-dialog"><form method="dialog"><h2 id="confirm-title">确认操作</h2><p id="confirm-text"></p><div class="actions"><button value="cancel" autofocus>取消</button><button value="confirm" class="primary">确认</button></div></form></dialog>
+    <dialog id="shortcuts-dialog" class="shortcuts-dialog" aria-labelledby="shortcuts-title">
+      <form id="shortcuts-form" autocomplete="off">
+        <h2 id="shortcuts-title">快捷键设置</h2>
+        <p id="shortcut-help" class="muted">点击键位框后按组合键；退格或“清除”可禁用。Mod 表示 Mac 的 ⌘，其他系统的 Ctrl。按字母／数字键位识别，仅在正文编辑区生效；设置保存在当前浏览器。</p>
+        <div class="shortcut-grid">{COMMANDS.filter(command => command.id !== "heading1").map(command => <div class="shortcut-row">
+          <label for={`shortcut-${command.id}`}>{command.label}</label>
+          <input id={`shortcut-${command.id}`} data-shortcut-command={command.id} aria-label={`${command.label}快捷键`} aria-describedby="shortcut-help" readonly spellcheck="false" placeholder="未绑定" />
+          <button type="button" data-clear-shortcut={command.id} aria-label={`清除${command.label}快捷键`}>清除</button>
+        </div>)}</div>
+        <p id="shortcut-error" role="status" aria-live="polite"></p>
+        <div class="shortcut-actions"><button id="reset-shortcuts" type="button">恢复默认</button><div><button id="cancel-shortcuts" type="button">取消</button><button id="save-shortcuts" type="submit" class="primary">保存快捷键</button></div></div>
+      </form>
+    </dialog>
+    <noscript>管理后台需要启用 JavaScript。凭据不会在构建时嵌入页面。</noscript>
+    <script>import "../../admin/app";</script>
+  </body>
+</html>
