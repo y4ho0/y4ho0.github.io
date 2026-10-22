@@ -150,3 +150,72 @@ test("mobile and admin controls use the same early preference without a System h
     await expectBoundPreference(page, ".admin-header", "dark");
   } finally { modules.resume(); }
 });
+
+test("compact menus keep search beside Close and fit phone, tablet and landscape screens in both languages", async ({ page }) => {
+  await page.goto("/about/");
+  const menu = page.locator("#mobile-menu");
+  for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 768, height: 1024 }, { width: 844, height: 390 }, { width: 1152, height: 600 }]) {
+    await page.setViewportSize(size);
+    for (const language of ["zh-CN", "en"]) {
+      await page.locator(".mobile-menu-trigger").click();
+      await menu.locator(`[data-language-value="${language}"]`).click();
+      const search = await menu.locator(".mobile-menu__search-link").boundingBox();
+      const close = await menu.locator(".mobile-menu__close").boundingBox();
+      const bounds = await menu.boundingBox();
+      expect(search!.x + search!.width).toBeLessThan(close!.x);
+      expect(Math.abs(search!.y - close!.y)).toBeLessThan(1);
+      expect(search!.width).toBeGreaterThanOrEqual(44);
+      expect(search!.height).toBeGreaterThanOrEqual(44);
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(size.width);
+      expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(size.height);
+      expect(await menu.evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
+      await expect(menu.locator("nav a")).toHaveCount(6);
+      await expect(menu.locator('nav a[href="/about/"]')).toHaveAttribute("aria-current", "page");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await menu.locator(".mobile-menu__close").click();
+    }
+  }
+});
+
+test("menu actions stay reachable in short windows, trap focus and lock background scrolling", async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 300 });
+  await page.goto("/");
+  await page.evaluate(() => { document.documentElement.style.scrollBehavior = "auto"; window.scrollTo(0, 400); });
+  const trigger = page.locator(".mobile-menu-trigger");
+  const menu = page.locator("#mobile-menu");
+  const close = menu.locator(".mobile-menu__close");
+  const search = menu.locator(".mobile-menu__search-link");
+  const wordmarkBefore = await page.locator(".wordmark").boundingBox();
+  await trigger.click();
+  await expect(close).toBeFocused();
+  const wordmarkAfter = await page.locator(".wordmark").boundingBox();
+  expect(wordmarkAfter!.x).toBeCloseTo(wordmarkBefore!.x, 1);
+  await page.keyboard.press("Shift+Tab");
+  await expect(search).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(menu.locator('[data-language-value="en"]')).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(search).toBeFocused();
+
+  const headerBefore = await menu.locator(".mobile-menu__header").boundingBox();
+  expect(await menu.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+  await menu.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  const headerAfter = await menu.locator(".mobile-menu__header").boundingBox();
+  expect(headerAfter!.y).toBeCloseTo(headerBefore!.y, 1);
+  const scrollBefore = await page.evaluate(() => scrollY);
+  await page.mouse.move(4, 150);
+  await page.mouse.wheel(0, 500);
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => scrollY)).toBe(scrollBefore);
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await page.mouse.wheel(0, 200);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(scrollBefore);
+
+  await trigger.click();
+  await search.click();
+  await expect(page).toHaveURL(/\/search\/$/);
+  await expect(page.locator("[data-search-input]").filter({ visible: true })).toBeVisible();
+});

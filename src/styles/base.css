@@ -6,6 +6,7 @@
 
 html {
   min-width: 20rem;
+  scrollbar-gutter: stable;
   scroll-behavior: smooth;
   background: var(--color-background);
 }

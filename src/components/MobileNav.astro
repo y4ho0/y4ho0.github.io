@@ -12,7 +12,6 @@ const links = [
   ["实验", "Labs", "/labs/"],
   ["随笔", "Essays", "/essays/"],
   ["归档", "Archive", "/archive/"],
-  ["搜索", "Search", "/search/"],
   ["关于", "About", "/about/"],
 ] as const;
 ---
@@ -21,10 +20,13 @@ const links = [
 <dialog class="mobile-menu" id="mobile-menu" aria-labelledby="mobile-menu-title">
   <div class="mobile-menu__header">
     <span id="mobile-menu-title"><UiText zh="逛逛花园" en="Explore the garden" /></span>
-    <button class="mobile-menu__close" type="button" {...uiAttrs({ "aria-label": { zh: "关闭菜单", en: "Close menu" } })}><UiText zh="关闭" en="Close" /></button>
+    <div class="mobile-menu__actions">
+      <a class="mobile-menu__search-link" href="/search/" {...uiAttrs({ "aria-label": { zh: "搜索", en: "Search" }, title: { zh: "搜索", en: "Search" } })}><SearchIcon /></a>
+      <button class="mobile-menu__close" type="button" {...uiAttrs({ "aria-label": { zh: "关闭菜单", en: "Close menu" } })}><UiText zh="关闭" en="Close" /></button>
+    </div>
   </div>
   <nav {...uiAttrs({ "aria-label": { zh: "移动导航", en: "Mobile navigation" } })}>
-    {links.map(([zh, en, href]) => <a href={href} class:list={{ "mobile-menu__search-link": href === "/search/" }} aria-current={pathname.startsWith(href) ? "page" : undefined} {...(href === "/search/" ? uiAttrs({ "aria-label": { zh, en }, title: { zh, en } }) : {})}>{href === "/search/" ? <SearchIcon /> : <UiText zh={zh} en={en} />}</a>)}
+    {links.map(([zh, en, href]) => <a href={href} aria-current={pathname.startsWith(href) ? "page" : undefined}><UiText zh={zh} en={en} /></a>)}
   </nav>
   <div class="mobile-menu__theme"><span><UiText zh="主题" en="Theme" /></span><ThemeControl localized /></div>
   <div class="mobile-menu__theme"><span><UiText zh="语言" en="Language" /></span><LanguageControl /></div>
