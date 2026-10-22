@@ -35,7 +35,15 @@ const locatedPostCount = postLocations.reduce((total, location) => total + locat
         {postLocations.map((location) => <span>{location.name}<strong>{location.count}</strong></span>)}
       </p>}
     </div>
-    <GlobeEarth locations={postLocations} />
+    <figure class="home-globe-panel__visual">
+      <GlobeEarth locations={postLocations} />
+      <figcaption class="home-globe-panel__credit">
+        <UiText zh="地球组件：" en="Globe: " />
+        <a href="https://cobe.vercel.app/" target="_blank" rel="noopener noreferrer">COBE</a>
+        <span aria-hidden="true"> · </span>
+        <span>by <a href="https://github.com/shuding" target="_blank" rel="noopener noreferrer">shuding</a></span>
+      </figcaption>
+    </figure>
   </section>
   <div class="home-sections site-shell">
     {courses.length > 0 && <section class="home-section" aria-labelledby="home-courses"><header><p class="eyebrow"><UiText zh="路径" en="Paths" /></p><h2 id="home-courses"><UiText zh="课程" en="Courses" /></h2><a href="/courses/"><UiText zh="查看全部" en="View all" /></a></header><div class="content-grid">{courses.map((entry) => <ContentCard entry={entry} />)}</div></section>}

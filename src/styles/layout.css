@@ -121,6 +121,22 @@
   max-width: 28rem;
 }
 
+.home-globe-panel__visual {
+  display: grid;
+  justify-items: center;
+  justify-self: end;
+  min-width: 0;
+  margin: 0;
+  gap: 0.5rem;
+}
+
+.home-globe-panel__credit {
+  color: var(--color-muted-readable);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
 .home-globe-panel h2 {
   max-width: 14ch;
   margin: 0;
@@ -324,6 +340,10 @@
   .home-globe-panel__copy {
     display: grid;
     justify-items: center;
+  }
+
+  .home-globe-panel__visual {
+    justify-self: center;
   }
 
   .globe-earth {
