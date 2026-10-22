@@ -177,8 +177,7 @@ const globeLabelZh = locations.length > 0
         theta,
         dark: palette.dark,
         diffuse: 1.08,
-        // Keep the original dot distribution, with only 7.5% fewer samples.
-        mapSamples: size < 220 ? 9250 : 13875,
+        mapSamples: 10000,
         mapBrightness: palette.mapBrightness,
         mapBaseBrightness: palette.mapBaseBrightness,
         baseColor: palette.baseColor,

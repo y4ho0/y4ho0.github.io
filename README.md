@@ -75,7 +75,7 @@ Language switching updates interface labels, page titles, descriptions, search m
 
 Static output and search indexing use the default Chinese interface plus original article content. The alternate English UI text is excluded from Pagefind so labels are not indexed twice. Search queries make CJK word boundaries explicit so Chinese search also works when Pagefind is first loaded in English mode; this does not translate queries or content. No translation service or runtime dependency is added. Without JavaScript, the public pages remain readable in Chinese.
 
-The globe uses the original COBE renderer and regular point distribution, with only a 7.5% reduction in dot count (9,250 / 13,875 samples). Its original palette, brightness, geographic texture, markers, dragging and keyboard controls are retained.
+The globe uses 10,000 samples with COBE's original renderer and regular point distribution. Its original palette, brightness, geographic texture, markers, dragging and keyboard controls are retained. A credit below the globe links to the COBE website and its author.
 
 ## Friend links
 
