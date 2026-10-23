@@ -5,6 +5,12 @@ updatedAt: 2026-10-23
 tags: ["Linux", "Apple Silicon", "UTM", "QEMU", "Troubleshooting"]
 status: growing
 draft: true
+course: distributed-data-systems
+related:
+  - collection: labs
+    entry: hdfs-command-experiments
+  - collection: notes
+    entry: hadoop-storage-compute-scheduling
 ---
 
 一份已经配置好 Java 和 Hadoop 的 Ubuntu 虚拟机，理论上只需导入 VirtualBox 就能运行。但当宿主机是 Apple M2 Pro，而镜像面向 x86_64 架构时，“导入并启动”就变成了一次完整的环境迁移。
