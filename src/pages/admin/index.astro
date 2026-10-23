@@ -2,7 +2,9 @@
 import "../../styles/tokens.css";
 import "../../styles/base.css";
 import "../../styles/wenkai.css";
+import "../../styles/wenkai-ui.css";
 import "../../admin/admin.css";
+import wenkaiFont from "../../data/wenkai-ui-font.json";
 import ThemeControl from "../../components/ThemeControl.astro";
 import { COMMANDS } from "../../admin/markdown-commands";
 const toolGroups = [
@@ -21,6 +23,7 @@ const toolGroups = [
     <meta name="robots" content="noindex, nofollow" />
     <meta name="referrer" content="no-referrer" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.github.com; img-src 'self' data: blob: https:; font-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <link rel="preload" href={wenkaiFont.url} as="font" type="font/woff2" crossorigin="anonymous" />
     <link rel="canonical" href="https://y4ho0.github.io/admin/" />
     <link rel="icon" href="/favicon-32.png" />
     <meta name="theme-color" content="#f4f0e6" />

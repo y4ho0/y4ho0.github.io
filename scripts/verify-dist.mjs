@@ -1,8 +1,15 @@
 import { access, readFile, readdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 
 const dist = path.resolve("dist");
 const errors = [];
+const criticalFont = JSON.parse(await readFile("src/data/wenkai-ui-font.json", "utf8"));
+const criticalFontBytes = await readFile(path.join(dist, criticalFont.url));
+const fontHash = createHash("sha256").update(criticalFontBytes).digest("hex").slice(0, 12);
+if (criticalFontBytes.length !== criticalFont.bytes || !criticalFont.url.endsWith(`ui-${fontHash}.woff2`)) {
+  errors.push("critical font does not match its content-hashed manifest");
+}
 
 async function walk(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -49,6 +56,10 @@ function internalTarget(href) {
 for (const file of htmlFiles) {
   const html = await readFile(file, "utf8");
   const relativeFile = path.relative(dist, file);
+  const fontPreloads = (html.match(/<link\b[^>]*>/gu) ?? []).filter(tag => /\brel="preload"/u.test(tag) && /\bas="font"/u.test(tag));
+  if (!fontPreloads.some(tag => tag.includes(`href="${criticalFont.url}"`) && /\bcrossorigin(?:=|\s|>)/u.test(tag))) {
+    errors.push(`${relativeFile} is missing its shared critical font preload`);
+  }
   const h1Count = (html.match(/<h1(?:\s|>)/gu) ?? []).length;
   if (h1Count !== 1) errors.push(`${relativeFile} has ${h1Count} h1 elements`);
   for (const imageTag of html.match(/<img\b[^>]*>/gu) ?? []) {
