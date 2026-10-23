@@ -85,6 +85,8 @@ Friend links appear on `/about/`. Add or update entries in `src/data/friends.ts`
 
 GitHub Actions builds and deploys the contents of `dist/` to GitHub Pages on pushes to `main`, manual runs, and the daily 00:10 Asia/Shanghai schedule. Pull requests run the same checks without uploading or deploying a production artifact. The workflow does not create automated commits or push generated quote state to Git.
 
+Before deploying, the job checks that its commit is still the current `main` revision. Outdated runs skip deployment so an earlier, slower build cannot replace a newer release.
+
 Before the first deployment, change **Settings → Pages → Build and deployment → Source** from the legacy `gh-pages` branch to **GitHub Actions**. This repository intentionally does not change that remote setting itself.
 
 ## License
