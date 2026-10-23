@@ -5,6 +5,12 @@ updatedAt: 2026-10-23
 tags: ["HDFS", "Hadoop", "Linux", "Distributed Systems"]
 status: growing
 draft: true
+course: distributed-data-systems
+related:
+  - collection: notes
+    entry: hdfs-read-write-replication
+  - collection: labs
+    entry: hdfs-command-experiments
 ---
 
 Linux 有 ls、cat、mkdir 和 mv；HDFS 也有几乎一样的操作。第一次用到这些命令，很容易产生一个疑问：既然指令长得差不多，所谓分布式文件系统究竟分布在什么地方？
