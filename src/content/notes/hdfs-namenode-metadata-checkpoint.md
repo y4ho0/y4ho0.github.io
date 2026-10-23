@@ -5,6 +5,12 @@ updatedAt: 2026-10-23
 tags: ["HDFS", "NameNode", "FsImage", "EditLog", "Recovery"]
 status: growing
 draft: true
+course: distributed-data-systems
+related:
+  - collection: notes
+    entry: hdfs-read-write-replication
+  - collection: notes
+    entry: hdfs-small-files-cost
 ---
 
 HDFS 的文件操作有一个容易让人困惑的地方：FsImage 不是每次操作后立即更新，为什么新创建的文件却能被其他客户端马上查到？如果此时 NameNode 断电，内存里的元数据又如何恢复？
