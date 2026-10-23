@@ -49,6 +49,12 @@ function internalTarget(href) {
 for (const file of htmlFiles) {
   const html = await readFile(file, "utf8");
   const relativeFile = path.relative(dist, file);
+  const documentEnd = html.lastIndexOf("</html>");
+  if (documentEnd < 0) {
+    errors.push(`${relativeFile} has no closing html element`);
+  } else if (html.slice(documentEnd + "</html>".length).trim()) {
+    errors.push(`${relativeFile} has content after the closing html element`);
+  }
   const h1Count = (html.match(/<h1(?:\s|>)/gu) ?? []).length;
   if (h1Count !== 1) errors.push(`${relativeFile} has ${h1Count} h1 elements`);
   for (const imageTag of html.match(/<img\b[^>]*>/gu) ?? []) {
