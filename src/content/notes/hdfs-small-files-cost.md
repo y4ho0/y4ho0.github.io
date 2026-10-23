@@ -5,6 +5,12 @@ updatedAt: 2026-10-23
 tags: ["HDFS", "NameNode", "Storage", "Performance"]
 status: seedling
 draft: true
+course: distributed-data-systems
+related:
+  - collection: notes
+    entry: hdfs-namenode-metadata-checkpoint
+  - collection: notes
+    entry: hdfs-vs-local-filesystem
 ---
 
 假设有两批数据：一批是少量大文件，另一批是上百万个几 KB 的文本文件。它们的总字节数可能相近，但放进 HDFS 后，对系统的压力未必相同。
