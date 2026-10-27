@@ -47,43 +47,11 @@ select {
 select:hover:not(:disabled) { border-color:var(--color-moss); }
 select:focus-visible { outline:0; border-color:var(--color-action); box-shadow:0 0 0 3px color-mix(in srgb,var(--color-primary) 18%,transparent); }
 select:disabled { cursor:not-allowed; opacity:.65; }
-@supports not (appearance:base-select) {
-  :root[data-theme=dark] select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%2383a18d' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
-}
+:root[data-theme=dark] select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%2383a18d' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 option, dialog, input::file-selector-button { font-family:inherit; }
-/* Keep native keyboard, form and assistive-technology behavior while styling
-   the open picker where supported. Older browsers retain their native menu. */
-@supports (appearance:base-select) and selector(select::picker(select)) {
-  select, select::picker(select) { appearance:base-select; }
-  select { position:relative; background-image:none; }
-  select::picker-icon {
-    position:absolute;
-    right:1.1rem;
-    top:50%;
-    width:.5rem;
-    height:.5rem;
-    content:"";
-    border-right:1.5px solid var(--color-action);
-    border-bottom:1.5px solid var(--color-action);
-    transform:translateY(-70%) rotate(45deg);
-  }
-  select:open::picker-icon { transform:translateY(-20%) rotate(225deg); }
-  select::picker(select) {
-    margin-block:.4rem;
-    padding:.35rem;
-    border:1px solid var(--color-border);
-    border-radius:.8rem;
-    background:var(--color-surface-raised);
-    color:var(--color-text);
-    box-shadow:0 8px 28px rgb(32 35 31 / 12%);
-    font:inherit;
-    max-height:min(20rem,60vh);
-  }
-  select option { gap:.65rem; min-height:2.5rem; padding:.55rem .65rem; border-radius:.45rem; }
-  select option:checked { background:color-mix(in srgb,var(--color-primary) 12%,var(--color-surface-raised)); color:var(--color-action); }
-  select option:is(:hover,:focus-visible) { background:color-mix(in srgb,var(--color-primary) 20%,var(--color-surface-raised)); outline:none; }
-  select option::checkmark { color:var(--color-action); }
-}
+/* Native select popups are rendered by the browser/OS. Avoid base-select
+   option-tree layout and font-dependent paint stalls on first open. */
+
 textarea { resize:vertical; }
 button { border:1px solid var(--color-border); background:var(--color-surface-raised); color:var(--color-text); padding:.55rem .8rem; border-radius:.4rem; cursor:pointer; font-size:.85rem; min-height:2.6rem; }
 button:hover:not(:disabled) { border-color:var(--color-action); }
