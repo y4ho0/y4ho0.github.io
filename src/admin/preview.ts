@@ -63,7 +63,7 @@ export async function previewDocument(markdown: string, heightToken?: string): P
   // Markdown is still sanitized; it cannot provide arbitrary executable code.
   const standalone = Boolean(heightToken && /^[a-f0-9-]{36}$/u.test(heightToken));
   const origin = window.location.origin;
-  const scriptPolicy = standalone ? "script-src " + origin : "script-src 'none'";
+  const scriptPolicy = standalone ? "script-src " + origin + "/admin/preview-height.js" : "script-src 'none'";
   const heightMeta = standalone ? '<meta name="garden-preview-token" content="' + heightToken + '">' : "";
   const heightScript = standalone ? '<script src="' + origin + '/admin/preview-height.js" defer></script>' : "";
   // No allow-same-origin, navigation, form submission, or storage access.
