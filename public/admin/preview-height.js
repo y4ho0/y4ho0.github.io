@@ -44,6 +44,7 @@
       || data.token !== token) return;
     if (data.type === "garden:preview-mode" && ["full", "split"].includes(data.mode)) {
       mode = data.mode;
+      marker.setAttribute("data-preview-mode", mode);
       if (mode === "full") {
         lastHeight = -1; // report height even if the text has not changed
         scheduleMeasure();
