@@ -10,7 +10,8 @@ export default function remarkKnowledgeTools() {
       if (node.name !== "term") return;
       const term = node.children.map(item => item.type === "text" ? item.value : "").join("").trim();
       const note = node.attributes?.note?.trim() ?? "";
-      if (!term || term.length > 80 || !note || note.length > 320) return;
+      if (!term || term.length > 80 || !note || note.length > 320
+        || /[<>"\\u0000-\\u001f]/u.test(term + note)) return;
       const data = node.data || (node.data = {});
       data.hName = "span";
       data.hProperties = {
