@@ -211,6 +211,8 @@ test("compact menus keep search beside Close and fit phone, tablet and landscape
     for (const language of ["zh-CN", "en"]) {
       await page.locator(".mobile-menu-trigger").click();
       await menu.locator(`[data-language-value="${language}"]`).click();
+      await expect(page.locator("html")).toHaveAttribute("data-ui-language", language);
+      await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
       const search = await menu.locator(".mobile-menu__search-link").boundingBox();
       const close = await menu.locator(".mobile-menu__close").boundingBox();
       const bounds = await menu.boundingBox();

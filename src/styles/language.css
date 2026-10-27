@@ -8,3 +8,36 @@
 :root:is([data-ui-language="zh-CN"], :not([data-ui-language])) .language-control button[data-language-value="zh-CN"],
 :root[data-ui-language="en"] .language-control button[data-language-value="en"] { color:var(--color-background); background:var(--color-action); }
 .mobile-menu__language { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-top:1rem; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Capture only individually named text. Controls, dialogs and the page
+     remain live, while ordinary navigation keeps its stationary header. */
+  :root[data-ui-language-transition="native"] { view-transition-name:none; }
+  :root[data-ui-language-transition="native"] .site-header { view-transition-name:none; }
+
+  :root[data-ui-language-transition="native"]::view-transition,
+  :root[data-ui-language-transition="native"]::view-transition-group(*),
+  :root[data-ui-language-transition="native"]::view-transition-image-pair(*),
+  :root[data-ui-language-transition="native"]::view-transition-old(*),
+  :root[data-ui-language-transition="native"]::view-transition-new(*) { pointer-events:none; }
+
+  :root[data-ui-language-transition="native"]::view-transition-group(*),
+  :root[data-ui-language-transition="native"]::view-transition-old(*),
+  :root[data-ui-language-transition="native"]::view-transition-new(*) {
+    animation-duration:260ms;
+    animation-timing-function:cubic-bezier(.4,0,.2,1);
+  }
+
+  /* Different translation lengths must not stretch the captured glyphs. */
+  :root[data-ui-language-transition="native"]::view-transition-old(*),
+  :root[data-ui-language-transition="native"]::view-transition-new(*) { width:auto; height:auto; }
+
+  :root[data-ui-language-transition="fallback"] :is(.ui-text,[data-ui-message],[data-ui-date]) {
+    animation:ui-language-reveal 200ms cubic-bezier(.4,0,.2,1) both;
+  }
+}
+
+@keyframes ui-language-reveal {
+  from { opacity:.2; }
+  to { opacity:1; }
+}

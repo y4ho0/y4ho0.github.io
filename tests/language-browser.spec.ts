@@ -262,3 +262,162 @@ test("the real Pagefind index finds Chinese phrases when it first loads with the
   await expect(input).toHaveValue("成长状态");
   expect(indexLoads).toBe(1);
 });
+
+async function observeLanguageMotion(page: Page, inspectMidpoint = false) {
+  await page.addInitScript(inspectMidpoint => {
+    const probes: { ready: boolean; finished: boolean; skipped: boolean; duration?: string; opacity?: number; headerName?: string }[] = [];
+    (window as any).__languageMotion = probes;
+    if (typeof document.startViewTransition !== "function") return;
+    const start = document.startViewTransition.bind(document);
+    document.startViewTransition = options => {
+      const transition = start(options);
+      const probe = { ready: false, finished: false, skipped: false } as (typeof probes)[number];
+      probes.push(probe);
+      void transition.ready.then(async () => {
+        probe.ready = true;
+        const animations = document.getAnimations().filter(animation =>
+          animation.effect instanceof KeyframeEffect && animation.effect.pseudoElement?.startsWith("::view-transition"));
+        const snapshot = animations.map(animation => (animation.effect as KeyframeEffect).pseudoElement)
+          .find(pseudo => pseudo?.startsWith("::view-transition-new("));
+        if (snapshot) probe.duration = getComputedStyle(document.documentElement, snapshot).animationDuration;
+        probe.headerName = getComputedStyle(document.querySelector(".site-header")!).viewTransitionName;
+        if (!inspectMidpoint || !snapshot) return;
+        // Inspect real native snapshot animations at a deterministic midpoint;
+        // do not infer smoothness merely from the root's temporary marker.
+        for (const animation of animations) { animation.pause(); animation.currentTime = 130; }
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        probe.opacity = Number(getComputedStyle(document.documentElement, snapshot).opacity);
+        for (const animation of animations) animation.play();
+      }, () => { probe.skipped = true; });
+      void transition.finished.then(() => { probe.finished = true; }, () => { probe.finished = true; });
+      return transition;
+    };
+  }, inspectMidpoint);
+}
+
+test("explicit language changes use a native eased fade and clean up without a refresh entrance animation", async ({ page }) => {
+  await observeLanguageMotion(page, true);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/about/");
+  await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+  expect(await page.evaluate(() => (window as any).__languageMotion)).toEqual([]);
+  await page.locator(".page-header h1 .ui-text").evaluate((element: HTMLElement) => {
+    element.style.viewTransitionName = "existing-heading";
+    element.style.color = "inherit";
+  });
+  await switchLanguage(page, "en");
+  await expect.poll(() => page.evaluate(() => (window as any).__languageMotion[0]?.opacity)).toBeGreaterThan(0);
+  const motion = await page.evaluate(() => (window as any).__languageMotion[0]);
+  expect(motion.opacity).toBeLessThan(1);
+  expect(motion.duration.split(",").every((value: string) => value.trim() === "0.26s")).toBe(true);
+  expect(motion.headerName).toBe("none");
+  await expect.poll(() => page.evaluate(() => (window as any).__languageMotion[0]?.finished)).toBe(true);
+  await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+  expect(await page.locator(".page-header h1 .ui-text").evaluate((element: HTMLElement) => ({ name: element.style.viewTransitionName, color: element.style.color })))
+    .toEqual({ name: "existing-heading", color: "inherit" });
+  expect(await page.evaluate(() => [...document.querySelectorAll<HTMLElement>("[style]")]
+    .some(element => element.style.viewTransitionName.startsWith("language-text-")))).toBe(false);
+  await page.reload();
+  await expectLanguage(page, "en");
+  expect(await page.evaluate(() => (window as any).__languageMotion)).toEqual([]);
+  await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+});
+
+test("rapid language clicks reach the final choice while preserving search, selection, scroll and an open mobile menu", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await observeLanguageMotion(page);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await mockPagefind(page);
+  await page.goto("/search/");
+  const input = page.locator("main [data-search-input]");
+  await input.fill("matrix");
+  await expect(page.locator("main [data-search-results] strong")).toHaveText(resultTitle);
+  const before = await page.evaluate(() => {
+    const input = document.querySelector<HTMLInputElement>("main [data-search-input]")!;
+    (window as any).__motionInput = input;
+    (window as any).__motionResult = document.querySelector("main [data-search-results] a");
+    document.querySelector<HTMLElement>("main")!.style.minHeight = "1400px";
+    input.setSelectionRange(1, 4, "backward");
+    window.scrollTo({ top: 300, behavior: "instant" });
+    return { start: input.selectionStart, end: input.selectionEnd, direction: input.selectionDirection, scroll: scrollY };
+  });
+  for (const language of ["en", "zh-CN"] as const) {
+    const bounds = await languageButton(page, language).boundingBox();
+    await page.mouse.click(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+    await expectLanguage(page, language);
+    if (language === "en") {
+      await expect.poll(() => page.evaluate(() => (window as any).__languageMotion.some((probe: any) => probe.ready))).toBe(true);
+      await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+      expect(await page.evaluate(() => getComputedStyle(document.documentElement, "::view-transition").pointerEvents)).toBe("none");
+    }
+  }
+  await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+  // Both handlers run before native snapshot callbacks, exercising the case
+  // where skipTransition must not let an older callback overwrite the last click.
+  await page.evaluate(() => {
+    document.querySelector<HTMLButtonElement>('.site-nav [data-language-value="en"]')!.click();
+    document.querySelector<HTMLButtonElement>('.site-nav [data-language-value="zh-CN"]')!.click();
+  });
+  await expect.poll(() => page.evaluate(() => (window as any).__languageMotion.every((probe: any) => probe.finished))).toBe(true);
+  await expectLanguage(page, "zh-CN");
+  expect(await page.evaluate(() => {
+    const input = document.querySelector<HTMLInputElement>("main [data-search-input]")!;
+    return { start: input.selectionStart, end: input.selectionEnd, direction: input.selectionDirection, scroll: scrollY,
+      sameInput: input === (window as any).__motionInput,
+      sameResult: document.querySelector("main [data-search-results] a") === (window as any).__motionResult,
+      value: input.value, savedLanguage: localStorage.getItem("garden-language") };
+  })).toEqual({ ...before, sameInput: true, sameResult: true, value: "matrix", savedLanguage: "zh-CN" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator(".mobile-menu-trigger").click();
+  for (const language of ["en", "zh-CN"] as const) {
+    const bounds = await languageButton(page, language, true).boundingBox();
+    await page.mouse.click(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+    await expectLanguage(page, language);
+    await expect(page.locator("#mobile-menu")).toBeVisible();
+    if (language === "en") {
+      await expect.poll(() => page.evaluate(() => (window as any).__languageMotion.at(-1)?.ready)).toBe(true);
+      await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    }
+  }
+  await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".mobile-menu-trigger")).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
+test("reduced motion and unsupported browsers retain immediate state and lifecycle synchronization", async ({ page }) => {
+  await observeLanguageMotion(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/about/");
+  await switchLanguage(page, "en");
+  await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+  expect(await page.evaluate(() => (window as any).__languageMotion)).toEqual([]);
+  await page.addInitScript(() => Object.defineProperty(document, "startViewTransition", { configurable: true, value: undefined }));
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.reload();
+  await expectLanguage(page, "en");
+  await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+  const fallback = await page.evaluate(() => {
+    document.querySelector<HTMLButtonElement>('.site-nav [data-language-value="zh-CN"]')!.click();
+    return { mode: document.documentElement.dataset.uiLanguageTransition,
+      durations: document.getAnimations().map(animation => animation.effect?.getTiming().duration) };
+  });
+  expect(fallback.mode).toBe("fallback");
+  expect(fallback.durations).toContain(200);
+  await expectLanguage(page, "zh-CN");
+  await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+  await page.evaluate(() => {
+    localStorage.setItem("garden-language", "en");
+    window.dispatchEvent(new StorageEvent("storage", { key: "garden-language" }));
+  });
+  await expectLanguage(page, "en");
+  await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+  await page.evaluate(() => {
+    localStorage.setItem("garden-language", "zh-CN");
+    window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+  });
+  await expectLanguage(page, "zh-CN");
+  await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+  expect(await page.evaluate(() => (window as any).__languageMotion)).toEqual([]);
+});
