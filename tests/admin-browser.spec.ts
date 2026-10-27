@@ -507,24 +507,13 @@ test("preview uses the self-hosted Chinese body font across formatting while cod
   expect(fontErrors).toEqual([]);
 });
 
-test("off-thread parser produces a sanitized preview without worker errors", async ({ page }) => {
-  const issues: string[] = [];
-  page.on("pageerror", error => issues.push("page-error: " + error.message));
-  page.on("console", message => { if (message.type() === "error") issues.push("console: " + message.text()); });
-  page.on("worker", worker => {
-    issues.push("worker-created: " + worker.url());
-  });
+test("preview remains functional without an unsafe worker fallback", async ({ page }) => {
   await mockGitHub(page); await openAdmin(page);
-  await page.locator("#markdown").fill("## Worker diagnostic\n\nThis preview must become visible.");
-  try {
-    await expect(page.frameLocator("#preview").getByRole("heading", { name: "Worker diagnostic" })).toBeVisible({ timeout: 6500 });
-  } catch {
-    const notice = await page.locator("#notice").textContent();
-    const iframe = await page.locator("#preview").evaluate((node: HTMLIFrameElement) => ({
-      hasSrcdoc: Boolean(node.srcdoc), tokenMarkup: node.srcdoc.slice(0, 120),
-    }));
-    throw new Error("Preview worker failed: " + JSON.stringify({ notice, iframe, issues }));
-  }
+  await page.locator("#markdown").fill("## Sanitized preview\n\n**This content must appear.**");
+  const preview = page.frameLocator("#preview");
+  await expect(preview.getByRole("heading", { name: "Sanitized preview" })).toBeVisible();
+  await expect(preview.locator("strong")).toHaveText("This content must appear.");
+  await expect(page.locator("#preview")).toHaveAttribute("sandbox", "allow-scripts");
 });
 
 test("preview mode switch reuses the current document instead of rebuilding it", async ({ page }) => {
