@@ -34,8 +34,9 @@ function renderMarkup(markdown: string): Promise<string> {
         if (typeof result.html === "string") request.resolve(result.html);
         else request.reject(new Error(result.error || "Markdown 处理失败"));
       });
-      worker.addEventListener("error", () => {
-        for (const request of waiting.values()) request.reject(new Error("后台预览工作线程运行失败"));
+      worker.addEventListener("error", (event: ErrorEvent) => {
+        console.error("[preview-worker-load]", event.message, event.filename, event.lineno);
+        for (const request of waiting.values()) request.reject(new Error("后台预览工作线程运行失败：" + event.message));
         waiting.clear();
         worker?.terminate();
         worker = undefined;
