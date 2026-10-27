@@ -25,6 +25,9 @@ test("admin inserts a focused term note and previews the same terminology", asyn
   // card, not vanish when pointer leaves the word.
   await trigger.hover();
   await expect(panel).toHaveCSS("visibility", "visible");
+  // The preview deliberately executes no JS. Focus keeps the fixed card open
+  // while travelling to its safe on-screen position.
+  await trigger.focus();
   await panel.hover();
   await expect(panel).toHaveCSS("visibility", "visible");
   await expect(panel).toHaveCSS("user-select", "text");
