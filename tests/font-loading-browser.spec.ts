@@ -18,7 +18,7 @@ async function isolatedPage(browser: Browser, language: Language = "zh-CN") {
     localStorage.setItem("garden-theme", language === "en" ? "dark" : "light");
   }, language);
   // Isolate typography from decorative canvas work. Software WebGL on CI can
-  // consume the browser's bounded font-display:block period before a screenshot
+  // consume the font loading interval before a screenshot
   // is captured. The other browser suites exercise these scripts normally.
   await context.route(/\/_astro\/(?:GlobeEarth|HomeCanvas)\.astro_astro_type_script_.*\.js$/u,
     route => route.fulfill({ contentType: "text/javascript", body: "export {};" }));
@@ -56,7 +56,7 @@ async function pagePixels(session: CDPSession, page: Page) {
 }
 
 /** Compare the actual pixels with the same page with only probe text hidden.
- * Chromium can report fallback glyph metrics during font-display:block, even
+ * Chromium can report fallback glyph metrics during font loading, even
  * though those glyphs are not painted. CDP font names alone cannot test FOUT. */
 async function textVisibilityPixels(page: Page, session: CDPSession, selectors: string[]) {
   // Decorative media and an independently updating preview iframe do not
@@ -125,15 +125,15 @@ async function verifyColdLoad(browser: Browser, path: string, probes: string[], 
       probes.push(".daily-quote__sizer");
       if (await page.locator(".daily-quote figcaption > span").count()) probes.push(".daily-quote figcaption > span");
     }
-    // Keep requests pending across real browser frames, within the browser's
-    // bounded block period, rather than testing only the final loaded state.
+    // Keep font requests pending across frames; fallback glyphs must already
+    // be readable rather than invisible for several seconds.
     await page.waitForTimeout(160);
     const blocked = await textVisibilityPixels(page, session, probes);
-    if (!blocked.shown.equals(blocked.hidden)) {
-      await test.info().attach("held-fonts-painted", { body: blocked.shown, contentType: "image/png" });
+    if (blocked.shown.equals(blocked.hidden)) {
+      await test.info().attach("held-fonts-blank", { body: blocked.shown, contentType: "image/png" });
       await test.info().attach("held-fonts-reference", { body: blocked.hidden, contentType: "image/png" });
     }
-    expect(blocked.shown.equals(blocked.hidden), `${path} (${language}): held fonts must not paint fallback text`).toBe(true);
+    expect(blocked.shown.equals(blocked.hidden), `${path} (${language}): fallback text must remain visible while fonts load`).toBe(false);
     gate.release();
     await page.evaluate(() => document.fonts.ready);
     await expectWenKai(session, probes);
@@ -145,11 +145,11 @@ async function verifyColdLoad(browser: Browser, path: string, probes: string[], 
   }
 }
 
-test("admin cold load waits for its self-hosted critical font without painting old glyphs", async ({ browser }) => {
+test("admin cold load displays legible fallback while custom fonts arrive", async ({ browser }) => {
   await verifyColdLoad(browser, "/admin/", adminProbes);
 });
 
-test("public home, archive and about keep initial Chinese and English glyphs consistent", async ({ browser }) => {
+test("public pages display fallback immediately and upgrade when fonts arrive", async ({ browser }) => {
   test.setTimeout(90_000);
   for (const language of ["zh-CN", "en"] as const) {
     for (const path of ["/", "/archive/", "/about/"]) {

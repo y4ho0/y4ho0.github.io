@@ -50,13 +50,25 @@ const processor = unified().use(remarkParse).use(remarkGfm).use(remarkMath).use(
   .use(rehypeKatex, { trust: false, strict: "warn", output: "htmlAndMathml" })
   .use(rehypeHighlight, { detect: false, ignoreMissing: true }).use(taskMarkers).use(rehypeStringify);
 
+// Cache only the last sanitized result. No unsanitized markup is reused;
+// token and preview mode are always generated independently.
+let cachedSource: string | undefined;
+let cachedSafe: string | undefined;
+const CACHE_LIMIT = 512 * 1024;
 export async function previewDocument(markdown: string, controlToken?: string, mode: "full" | "split" = "full"): Promise<string> {
-  const rendered = String(await processor.process(markdown));
-  const safe = DOMPurify.sanitize(rendered, {
-    USE_PROFILES: { html: true, mathMl: true, svg: true },
-    FORBID_TAGS: ["style", "form", "input", "button", "iframe", "object", "embed"],
-    FORBID_ATTR: ["id", "name"],
-  });
+  let safe: string;
+  if (markdown === cachedSource && cachedSafe !== undefined) {
+    safe = cachedSafe;
+  } else {
+    const rendered = String(await processor.process(markdown));
+    safe = DOMPurify.sanitize(rendered, {
+      USE_PROFILES: { html: true, mathMl: true, svg: true },
+      FORBID_TAGS: ["style", "form", "input", "button", "iframe", "object", "embed"],
+      FORBID_ATTR: ["id", "name"],
+    });
+    cachedSource = markdown.length <= CACHE_LIMIT ? markdown : undefined;
+    cachedSafe = markdown.length <= CACHE_LIMIT ? safe : undefined;
+  }
   // Only a fixed repository-owned script may run in the opaque-origin
   // sandbox. It reports full-mode height or split-mode scroll progress;
   // Markdown remains sanitized, cannot run scripts, and cannot access parent.
