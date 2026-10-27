@@ -20,11 +20,16 @@
   const schedule = () => {
     if (queued) return;
     queued = true;
-    requestAnimationFrame(measure);
+    // rAF can be entirely suspended for an offscreen sandboxed iframe on
+    // mobile; a one-shot task reports height even before the reader scrolls
+    // down to the preview.
+    setTimeout(measure, 0);
   };
   new ResizeObserver(schedule).observe(document.body);
   window.addEventListener("load", schedule, { once: true });
   window.addEventListener("resize", schedule);
   document.fonts?.ready.then(schedule).catch(() => {});
+  // Initial measurement must not depend on viewport visibility.
+  measure();
   schedule();
 })();
