@@ -448,7 +448,10 @@ test("split preview renders GFM, highlighted code and math while hostile HTML ca
   expect(mathFonts.family).toContain("KaTeX_Math");
   const renderedMathFonts = await actualGlyphFonts(page, preview.locator(".mathnormal").first());
   expect(renderedMathFonts.some(font => font.isCustomFont && font.familyName === "KaTeX_Math")).toBe(true);
-  await expect(preview.locator("script,[onerror],a[href^='javascript:']")).toHaveCount(0);
+  await expect(preview.locator("script:not([src$='/admin/preview-height.js']),[onerror],a[href^='javascript:']")).toHaveCount(0);
+  // The only script permitted by CSP is our fixed scroll bridge; article
+  // markup and inline event handlers must remain inert and sanitized.
+  await expect(preview.locator("script[src$='/admin/preview-height.js']")).toHaveCount(1);
   expect(await page.evaluate(() => (window as any).__adminXss)).toBe(0);
   await expect(page.locator("#preview")).toHaveAttribute("sandbox", "allow-scripts");
   const separator = page.locator("#splitter");
