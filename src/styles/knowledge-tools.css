@@ -136,6 +136,25 @@ html[data-theme-preview] .prose .term-note__panel {
   .prose .term-note__trigger { transition: none; }
 }
 
+/* A split-editor iframe may be only ~30rem wide even on a desktop with a
+   mouse. Width alone must not force its note to the far bottom of the frame. */
+@media (hover: hover) {
+  html[data-theme-preview] .prose .term-note__panel,
+  html[data-theme-preview] .prose .term-note[data-placement="top"] .term-note__panel {
+    position: absolute;
+    top: calc(100% + .35rem);
+    bottom: auto;
+    left: 0 !important;
+    right: auto !important;
+    width: max-content;
+    min-width: min(14rem, calc(100vw - 2rem));
+    max-width: min(26rem, calc(100vw - 2rem));
+    max-height: min(31vh, 15rem);
+    padding: .85rem 1rem 1rem;
+  }
+  html[data-theme-preview] .prose .term-note::before { display: block; }
+}
+
 .prose .prototype-card {
   margin: 1.5rem 0;
   padding: 1rem 1.2rem;
