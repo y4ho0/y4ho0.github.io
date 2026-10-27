@@ -24,7 +24,8 @@ test("an inline term becomes a keyboard-focusable, text-only explanation", () =>
 test("term explanation cannot introduce an HTML element", () => {
   const html = render(':term[X]{note="&#60;img src=x onerror=alert(1)&#62;"}');
   assert.doesNotMatch(html, /<img/u);
-  assert.match(html, /term-note/u);
+  assert.doesNotMatch(html, /term-note/u);
+  assert.match(html, /<span>X<\/span>/u);
 });
 
 test("a local prototype renders a regular link card, not an iframe", () => {
