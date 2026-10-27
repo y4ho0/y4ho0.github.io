@@ -21,15 +21,26 @@ export default function remarkKnowledgeTools() {
       }
       const data = node.data || (node.data = {});
       data.hName = "span";
-      data.hProperties = {
-        className: ["term-note"],
-        tabIndex: 0,
-        role: "button",
-        ariaLabel: term + "：" + note,
-        ariaExpanded: "false",
-        "data-note": note,
-      };
-      node.children = [{ type: "text", value: term }];
+      data.hProperties = { className: ["term-note"] };
+      // Keep the trigger and the explanation as real sibling DOM elements.
+      // ::after generated content cannot be selected, copied or hovered.
+      const inlineSpan = (className, value, properties = {}) => ({
+        type: "emphasis",
+        data: { hName: "span", hProperties: { className: [className], ...properties } },
+        children: [{ type: "text", value }],
+      });
+      node.children = [
+        inlineSpan("term-note__trigger", term, {
+          role: "button",
+          tabIndex: 0,
+          ariaExpanded: "false",
+          ariaLabel: term + "，查看术语释义",
+        }),
+        inlineSpan("term-note__panel", note, {
+          role: "note",
+          ariaLabel: "术语释义",
+        }),
+      ];
     });
 
     visit(tree, "containerDirective", (node) => {
