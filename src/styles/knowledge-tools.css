@@ -106,6 +106,23 @@
   pointer-events: auto;
 }
 
+/* The admin preview is an opaque-origin, scriptless iframe. It cannot
+   calculate anchored overflow. Keep the copyable card inside its own viewport
+   instead of loosening the iframe sandbox to run positioning scripts. */
+html[data-theme-preview] .prose .term-note__panel,
+html[data-theme-preview] .prose .term-note[data-placement="top"] .term-note__panel {
+  position: fixed;
+  top: auto;
+  bottom: 1rem;
+  left: 1rem !important;
+  right: 1rem !important;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  max-height: min(34vh, 16rem);
+}
+html[data-theme-preview] .prose .term-note::before { display: none; }
+
 /* On touch and narrow windows, the explanation rests above the safe-area edge,
    rather than following a tiny inline target across the screen. */
 @media (hover: none), (max-width: 40rem) {
