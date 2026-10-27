@@ -507,6 +507,58 @@ test("preview uses the self-hosted Chinese body font across formatting while cod
   expect(fontErrors).toEqual([]);
 });
 
+test("preview mode switch reuses the current document instead of rebuilding it", async ({ page }) => {
+  await mockGitHub(page); await openAdmin(page);
+  const editor = page.locator("#markdown");
+  const frame = page.locator("#preview");
+  const preview = page.frameLocator("#preview");
+  const content = ["## Instant mode switching", "",
+    ...Array.from({ length: 85 }, (_, i) => "### Heading " + i + "\n\n" +
+      "Render this long article once, then switch views without reloading its CSS, math or HTML.\n\n")].join("");
+  await editor.fill(content);
+  await expect(preview.getByRole("heading", { name: "Instant mode switching" })).toBeVisible();
+  await expect(preview.locator('meta[data-preview-mode="split"]')).toHaveCount(1);
+  const originalTimeOrigin = await preview.locator("body").evaluate(() => performance.timeOrigin);
+  const timing = await page.evaluate(async () => {
+    const start = performance.now();
+    document.querySelector<HTMLButtonElement>("#layout-tabs")!.click();
+    document.querySelector<HTMLButtonElement>("#tab-preview")!.click();
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    return performance.now() - start;
+  });
+  await expect(preview.locator('meta[data-preview-mode="full"]')).toHaveCount(1);
+  expect(await preview.locator("body").evaluate(() => performance.timeOrigin)).toBe(originalTimeOrigin);
+  // Fast-path budget includes two browser frames, without a network fetch or
+  // slow parser. CI figures are not a promise for every end-user device.
+  console.info("preview-mode-two-frame-ms", timing.toFixed(1));
+  expect(timing).toBeLessThan(500);
+  await expect.poll(async () => frame.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThan(1800);
+  await page.locator("#tab-edit").click();
+  await page.locator("#layout-split").click();
+  await expect(preview.locator('meta[data-preview-mode="split"]')).toHaveCount(1);
+  expect(await preview.locator("body").evaluate(() => performance.timeOrigin)).toBe(originalTimeOrigin);
+  await expect(editor).toHaveValue(content);
+});
+
+test("dropdowns use native pickers and visible fallback while WenKai fonts load", async ({ page }) => {
+  // Block all WOFF2 requests to emulate a broken/slow font CDN. UI must still
+  // draw labels/options without a 3-second font-display:block invisible period.
+  await page.route(/\.woff2(?:\?.*)?$/u, route => route.abort());
+  await mockGitHub(page); await openAdmin(page);
+  const outcome = await page.locator('select[name="status"]').evaluate((node: HTMLSelectElement) => ({
+    picker: getComputedStyle(node).appearance,
+    labels: [...node.options].map(option => option.textContent?.trim()),
+    fontFaces: [...document.fonts].filter(face => face.family.includes("WenKai"))
+      .map(face => ({ family: face.family, display: face.display })),
+  }));
+  expect(outcome.picker).toBe("none");
+  expect(outcome.labels).toContain("growing · 成长");
+  expect(outcome.fontFaces.length).toBeGreaterThan(0);
+  expect(outcome.fontFaces.every(face => face.display === "swap")).toBe(true);
+  await page.locator('select[name="status"]').selectOption("evergreen");
+  await expect(page.locator('select[name="status"]')).toHaveValue("evergreen");
+});
+
 test("split and tabbed editor start with exactly the same pane height", async ({ page }) => {
   await mockGitHub(page); await openAdmin(page);
   await expect(page.locator("#writing-area")).toHaveAttribute("data-layout", "split");
