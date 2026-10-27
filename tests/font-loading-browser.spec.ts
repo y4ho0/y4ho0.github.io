@@ -17,6 +17,11 @@ async function isolatedPage(browser: Browser, language: Language = "zh-CN") {
     localStorage.setItem("garden-language", language);
     localStorage.setItem("garden-theme", language === "en" ? "dark" : "light");
   }, language);
+  // Isolate typography from decorative canvas work. Software WebGL on CI can
+  // consume the browser's bounded font-display:block period before a screenshot
+  // is captured. The other browser suites exercise these scripts normally.
+  await context.route(/\/_astro\/(?:GlobeEarth|HomeCanvas)\.astro_astro_type_script_.*\.js$/u,
+    route => route.fulfill({ contentType: "text/javascript", body: "export {};" }));
   const page = await context.newPage();
   const session = await context.newCDPSession(page);
   await session.send("DOM.enable");
