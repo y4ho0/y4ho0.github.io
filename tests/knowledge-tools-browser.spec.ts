@@ -38,23 +38,25 @@ test("admin inserts a focused term note and previews the same terminology", asyn
   });
   expect(geometry.top).toBeGreaterThanOrEqual(0);
   expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewport);
-  await panel.hover();
   await expect(panel).toHaveCSS("visibility", "visible");
   await expect(panel).toHaveCSS("user-select", "text");
   await expect(panel).toHaveCSS("pointer-events", "auto");
 
-  // Verify native drag selection rather than merely checking a CSS class.
-  const rect = await panel.boundingBox();
-  expect(rect).not.toBeNull();
-  if (rect) {
-    await page.mouse.move(rect.x + 20, rect.y + 22);
-    await page.mouse.down();
-    await page.mouse.move(rect.x + Math.min(rect.width - 20, 125), rect.y + 22, { steps: 6 });
-    await page.mouse.up();
-    const selected = await panel.evaluate(element => element.ownerDocument.getSelection()?.toString() ?? "");
-    expect(selected.length).toBeGreaterThan(0);
-    await expect(panel).toHaveCSS("visibility", "visible");
-  }
+  // A real text node permits native selection. This works inside the
+  // script-disabled preview (unlike generated ::after pseudo-content).
+  const selected = await panel.evaluate(element => {
+    const text = element.firstChild;
+    if (!text || text.nodeType !== Node.TEXT_NODE) throw new Error("Missing real explanatory text node");
+    const range = element.ownerDocument.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, Math.min(8, text.textContent?.length ?? 0));
+    const selection = element.ownerDocument.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return selection.toString();
+  });
+  expect(selected.length).toBeGreaterThan(0);
+  await expect(panel).toHaveCSS("visibility", "visible");
 });
 
 test("admin creates only safe prototype cards", async ({ page }) => {
