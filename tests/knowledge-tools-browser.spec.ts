@@ -27,7 +27,17 @@ test("admin inserts a focused term note and previews the same terminology", asyn
   await expect(panel).toHaveCSS("visibility", "visible");
   // The preview deliberately executes no JS. Focus keeps the fixed card open
   // while travelling to its safe on-screen position.
+  // The preview iframe is 36rem tall and can initially sit below the page
+  // viewport because of the metadata form. Scroll its full frame into view
+  // before trying to enter a fixed-to-iframe explanation.
+  await page.locator("#preview").scrollIntoViewIfNeeded();
   await trigger.focus();
+  const geometry = await panel.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    return { top: box.top, bottom: box.bottom, viewport: element.ownerDocument.defaultView!.innerHeight };
+  });
+  expect(geometry.top).toBeGreaterThanOrEqual(0);
+  expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewport);
   await panel.hover();
   await expect(panel).toHaveCSS("visibility", "visible");
   await expect(panel).toHaveCSS("user-select", "text");
