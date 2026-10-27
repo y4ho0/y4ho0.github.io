@@ -85,6 +85,7 @@ const toolGroups = [
               {toolGroups[0].map(([id, label]) => <button type="button" data-command={id}>{label}</button>)}
             </div>
             {toolGroups.slice(1).map(group => <div class="format-group">{group.map(([id, label]) => <button type="button" data-command={id}>{label}</button>)}</div>)}
+            <div class="format-group" aria-label="知识组件"><button id="insert-term-note" type="button">术语便签</button><button id="insert-prototype" type="button">原型卡片</button></div>
           </div>
           <div id="editor-tabs" role="tablist" aria-label="编辑或预览"><button id="tab-edit" role="tab" aria-controls="edit-pane" aria-selected="true">编辑</button><button id="tab-preview" role="tab" aria-controls="preview-pane" aria-selected="false">预览</button></div>
           <div id="writing-area" class="writing-area" data-layout="split" data-tab="edit">
@@ -106,6 +107,17 @@ const toolGroups = [
       </div>
     </main>
     <dialog id="confirm-dialog"><form method="dialog"><h2 id="confirm-title">确认操作</h2><p id="confirm-text"></p><div class="actions"><button value="cancel" autofocus>取消</button><button value="confirm" class="primary">确认</button></div></form></dialog>
+    <dialog id="knowledge-dialog" aria-labelledby="knowledge-title">
+      <form id="knowledge-form" autocomplete="off">
+        <h2 id="knowledge-title">知识组件</h2>
+        <p class="muted">只插入纯文字解释或安全的原型链接，不运行任意脚本或嵌入第三方 iframe。术语在正文中悬浮/聚焦展示，原型在文章中呈现链接卡片。</p>
+        <label>术语 / 原型标题<input id="knowledge-label" type="text" maxlength="120" required /></label>
+        <label>简短解释 / 原型简介<textarea id="knowledge-note" rows="4" maxlength="500" required></textarea></label>
+        <label id="knowledge-url-field">原型链接（HTTPS 或本站 / 开头的路径）<input id="knowledge-url" type="text" maxlength="500" placeholder="/demos/hdfs-write/" /></label>
+        <p class="muted" id="knowledge-error" role="alert"></p>
+        <div class="actions"><button id="knowledge-cancel" type="button">取消</button><button type="submit" class="primary">插入 Markdown</button></div>
+      </form>
+    </dialog>
     <dialog id="shortcuts-dialog" class="shortcuts-dialog" aria-labelledby="shortcuts-title">
       <form id="shortcuts-form" autocomplete="off">
         <h2 id="shortcuts-title">快捷键设置</h2>

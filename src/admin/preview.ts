@@ -11,6 +11,8 @@ import DOMPurify from "dompurify";
 import { visit } from "unist-util-visit";
 import type { Root } from "hast";
 import remarkContentBlocks from "../plugins/remark-content-blocks.mjs";
+import remarkKnowledgeTools from "../plugins/remark-knowledge-tools.mjs";
+import knowledgeStyles from "../styles/knowledge-tools.css?inline";
 import tokens from "../styles/tokens.css?inline";
 import prose from "../styles/prose.css?inline";
 import themeMotion from "../styles/theme-motion.css?inline";
@@ -44,7 +46,7 @@ function taskMarkers() {
 }
 
 const processor = unified().use(remarkParse).use(remarkGfm).use(remarkMath).use(remarkDirective)
-  .use(remarkContentBlocks).use(remarkRehype) // Raw HTML is deliberately discarded.
+  .use(remarkContentBlocks).use(remarkKnowledgeTools).use(remarkRehype) // Raw HTML is deliberately discarded.
   .use(rehypeKatex, { trust: false, strict: "warn", output: "htmlAndMathml" })
   .use(rehypeHighlight, { detect: false, ignoreMissing: true }).use(taskMarkers).use(rehypeStringify);
 
@@ -59,5 +61,5 @@ export async function previewDocument(markdown: string): Promise<string> {
   // Styles are imported at build time; no remote rendering service is used.
   // Embedded media queries follow the parent iframe's color-scheme. Theme
   // switching updates this scriptless sandbox without reloading its document.
-  return `<!doctype html><html lang="zh-CN" data-theme-preview><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src https: data: ${window.location.origin}; font-src data: ${window.location.origin}; form-action 'none'; base-uri 'none'"><style>${tokens}\n${themeMotion}\n${wenkai}\n${wenkaiUi}\n${prose}\n${katex}\n${highlighting}\n@media(prefers-color-scheme:dark){${darkHighlighting}}\n*{box-sizing:border-box}body{margin:0;padding:1.5rem;background:var(--color-surface-raised);font-family:var(--font-body)}.prose{width:100%;overflow-wrap:anywhere}.prose pre code.hljs{background:transparent;padding:0}img{max-width:100%}table{display:block;overflow:auto}pre{white-space:pre-wrap}h1{font-size:2rem}</style></head><body><article class="prose">${safe}</article></body></html>`;
+  return `<!doctype html><html lang="zh-CN" data-theme-preview><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src https: data: ${window.location.origin}; font-src data: ${window.location.origin}; form-action 'none'; base-uri 'none'"><style>${tokens}\n${themeMotion}\n${wenkai}\n${wenkaiUi}\n${prose}\n${knowledgeStyles}\n${katex}\n${highlighting}\n@media(prefers-color-scheme:dark){${darkHighlighting}}\n*{box-sizing:border-box}body{margin:0;padding:1.5rem;background:var(--color-surface-raised);font-family:var(--font-body)}.prose{width:100%;overflow-wrap:anywhere}.prose pre code.hljs{background:transparent;padding:0}img{max-width:100%}table{display:block;overflow:auto}pre{white-space:pre-wrap}h1{font-size:2rem}</style></head><body><article class="prose">${safe}</article></body></html>`;
 }

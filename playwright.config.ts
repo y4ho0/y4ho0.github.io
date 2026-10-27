@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: ["admin-browser.spec.ts", "language-browser.spec.ts", "theme-browser.spec.ts", "navigation-browser.spec.ts", "ambient-browser.spec.ts", "font-loading-browser.spec.ts"],
+  testMatch: ["admin-browser.spec.ts", "knowledge-tools-browser.spec.ts", "language-browser.spec.ts", "theme-browser.spec.ts", "navigation-browser.spec.ts", "ambient-browser.spec.ts", "font-loading-browser.spec.ts"],
   fullyParallel: true,
   workers: 2,
   timeout: 45_000,

@@ -1,0 +1,62 @@
+/* No popover library, icon fonts or network calls. Content is plain text. */
+.prose .term-note {
+  position: relative;
+  display: inline;
+  color: var(--color-action);
+  cursor: help;
+  border-bottom: 1px dotted currentColor;
+  padding: 0 .08em;
+  border-radius: .15em;
+  outline-offset: .16em;
+}
+.prose .term-note:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+.prose .term-note::after {
+  content: attr(data-note);
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + .48rem);
+  left: 0;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: min(14rem, calc(100vw - 2rem));
+  max-width: min(26rem, calc(100vw - 2rem));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: .7rem .85rem;
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: .65rem;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 14%);
+  font: 400 .88rem/1.6 var(--font-body);
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.prose .term-note[data-side="right"]::after { left: auto; right: 0; }
+.prose .term-note:is(:hover,:focus,.is-open)::after { opacity: 1; visibility: visible; }
+@media (hover:none), (max-width:40rem) {
+  .prose .term-note::after {
+    position:fixed;
+    top:auto;
+    bottom:calc(1rem + env(safe-area-inset-bottom,0px));
+    left:1rem !important;
+    right:1rem !important;
+    max-width:none;
+    width:auto;
+    padding:1rem;
+  }
+}
+.prose .prototype-card {
+  margin: 1.5rem 0;
+  padding: 1rem 1.2rem;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: .7rem;
+  background: var(--color-surface);
+}
+.prose .prototype-card__link { margin:0 0 .45rem; font-weight:600; }
+.prose .prototype-card__link a { color:var(--color-action); }
+.prose .prototype-card > :last-child { margin-bottom:0; }
+.prose .prototype-card > :first-child { margin-top:0; }

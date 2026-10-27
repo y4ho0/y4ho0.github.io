@@ -3,6 +3,7 @@ import { GitHubClient, GitHubError, type CommitResult } from "./github";
 import { saveDraft, listDrafts, removeDraft, clearDrafts, type LocalDraft } from "./drafts";
 import { bindImageInput, validateImage } from "./media";
 import { bindEditorTools } from "./editor-tools";
+import { bindKnowledgeTools } from "./knowledge-tools";
 
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const form = el<HTMLFormElement>("metadata");
@@ -419,6 +420,17 @@ window.addEventListener("pagehide", () => { client.logout(); el<HTMLInputElement
 window.addEventListener("pageshow", event => { if (event.persisted) { sessionVersion++; updateControls(); el("identity").textContent = "本地写作 · 尚未连接 GitHub"; } });
 renderActive(); applyLayout();
 bindEditorTools({
+  editor,
+  prepare: () => {
+    if (busy) return false;
+    if (el("writing-area").dataset.layout === "tabs" && selectedTab === "preview") {
+      restorePosition(); selectedTab = "edit"; applyLayout();
+    }
+    return true;
+  },
+  afterEdit: rememberPosition,
+});
+bindKnowledgeTools({
   editor,
   prepare: () => {
     if (busy) return false;
