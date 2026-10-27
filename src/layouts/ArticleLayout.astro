@@ -3,6 +3,7 @@ import BaseLayout from "./BaseLayout.astro";
 import UiText from "../components/UiText.astro";
 import { uiAttrs } from "../lib/ui-language";
 import "katex/dist/katex.min.css";
+import "../styles/knowledge-tools.css";
 import Breadcrumbs from "../components/Breadcrumbs.astro";
 import RelatedContent from "../components/RelatedContent.astro";
 import TableOfContents from "../components/TableOfContents.astro";
@@ -74,6 +75,53 @@ const statusLabels = { seedling: { zh: "萌芽", en: "Seedling" }, growing: { zh
     block.append(button);
   });
 
+  // Progressive enhancement: CSS handles hover/focus even without JS.
+  // Delegated events avoid attaching a listener for every terminology instance.
+  const termRoot = document.querySelector<HTMLElement>(".article-shell");
+  let opened: HTMLElement | null = null;
+  const closeTerm = () => {
+    if (opened) { opened.classList.remove("is-open"); opened.setAttribute("aria-expanded", "false"); }
+    opened = null;
+  };
+  const revealTerm = (term: HTMLElement) => {
+    if (opened !== term) closeTerm();
+    opened = term;
+    term.classList.add("is-open");
+    term.setAttribute("aria-expanded", "true");
+    const bounds = term.getBoundingClientRect();
+    term.dataset.side = bounds.left > window.innerWidth * .62 ? "right" : "left";
+  };
+  termRoot?.addEventListener("pointerover", event => {
+    if (matchMedia("(hover: hover)").matches) {
+      const term = (event.target as Element).closest<HTMLElement>(".term-note");
+      if (term) revealTerm(term);
+    }
+  });
+  termRoot?.addEventListener("pointerout", event => {
+    const term = (event.target as Element).closest<HTMLElement>(".term-note");
+    if (term && !term.contains(event.relatedTarget as Node | null) && term !== document.activeElement) closeTerm();
+  });
+  termRoot?.addEventListener("focusin", event => {
+    const term = (event.target as Element).closest<HTMLElement>(".term-note");
+    if (term) revealTerm(term);
+  });
+  termRoot?.addEventListener("focusout", event => {
+    const term = (event.target as Element).closest<HTMLElement>(".term-note");
+    if (term && opened === term) closeTerm();
+  });
+  termRoot?.addEventListener("click", event => {
+    const term = (event.target as Element).closest<HTMLElement>(".term-note");
+    if (term) { revealTerm(term); term.focus(); }
+    else if (opened) { opened.blur(); closeTerm(); }
+  });
+  termRoot?.addEventListener("keydown", event => {
+    const term = (event.target as Element).closest<HTMLElement>(".term-note");
+    if (event.key === "Escape") { if (opened) { event.preventDefault(); opened.blur(); closeTerm(); } }
+    else if (term && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      revealTerm(term);
+    }
+  });
   const article = document.querySelector<HTMLElement>(".article-shell");
   const progress = document.querySelector<HTMLElement>(".reading-progress span");
   const headings = Array.from(document.querySelectorAll<HTMLElement>(".prose :is(h2, h3, h4)[id]"));
