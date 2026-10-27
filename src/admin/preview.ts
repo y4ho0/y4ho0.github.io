@@ -1,17 +1,4 @@
-import { unified } from "unified";
-import remarkParse from "remark-parse";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import remarkDirective from "remark-directive";
-import remarkRehype from "remark-rehype";
-import rehypeKatex from "rehype-katex";
-import rehypeHighlight from "rehype-highlight";
-import rehypeStringify from "rehype-stringify";
 import DOMPurify from "dompurify";
-import { visit } from "unist-util-visit";
-import type { Root } from "hast";
-import remarkContentBlocks from "../plugins/remark-content-blocks.mjs";
-import remarkKnowledgeTools from "../plugins/remark-knowledge-tools.mjs";
 import knowledgeStyles from "../styles/knowledge-tools.css?inline";
 import tokens from "../styles/tokens.css?inline";
 import prose from "../styles/prose.css?inline";
@@ -31,24 +18,34 @@ const katex = katexSource.replace(/src:[^;}]+/gu, source => {
   return font ? `src:url("${font}") format("woff2")` : "src:none";
 });
 
-// Keep task-list markers visible while continuing to forbid all input controls
-// in the sanitized, read-only preview.
-function taskMarkers() {
-  return (tree: Root) => {
-    visit(tree, "element", node => {
-      if (node.tagName !== "input" || node.properties.type !== "checkbox" || !node.properties.disabled) return;
-      const checked = Boolean(node.properties.checked);
-      node.tagName = "span";
-      node.properties = { className: ["task-checkbox"], role: "img", ariaLabel: checked ? "已完成" : "未完成" };
-      node.children = [{ type: "text", value: checked ? "☑" : "☐" }];
-    });
-  };
+// The parser worker never touches the DOM or the GitHub session.
+let worker: Worker | undefined;
+let requestId = 0;
+const waiting = new Map<number, { resolve: (html: string) => void; reject: (error: Error) => void }>();
+function renderMarkup(markdown: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!worker) {
+      worker = new Worker(new URL("./preview-worker.ts", import.meta.url), { type: "module" });
+      worker.addEventListener("message", (event: MessageEvent<{ id: number; html?: string; error?: string }>) => {
+        const result = event.data;
+        const request = waiting.get(result?.id);
+        if (!request) return;
+        waiting.delete(result.id);
+        if (typeof result.html === "string") request.resolve(result.html);
+        else request.reject(new Error(result.error || "Markdown 处理失败"));
+      });
+      worker.addEventListener("error", () => {
+        for (const request of waiting.values()) request.reject(new Error("后台预览工作线程运行失败"));
+        waiting.clear();
+        worker?.terminate();
+        worker = undefined;
+      });
+    }
+    const id = ++requestId;
+    waiting.set(id, { resolve, reject });
+    worker.postMessage({ id, markdown });
+  });
 }
-
-const processor = unified().use(remarkParse).use(remarkGfm).use(remarkMath).use(remarkDirective)
-  .use(remarkContentBlocks).use(remarkKnowledgeTools).use(remarkRehype) // Raw HTML is deliberately discarded.
-  .use(rehypeKatex, { trust: false, strict: "warn", output: "htmlAndMathml" })
-  .use(rehypeHighlight, { detect: false, ignoreMissing: true }).use(taskMarkers).use(rehypeStringify);
 
 // Cache only one sanitized document, never raw unsanitized HTML. Token/mode
 // remain independent so a new iframe can reuse parsing without reusing a
@@ -61,7 +58,7 @@ export async function previewDocument(markdown: string, controlToken?: string, m
   if (markdown === cachedSource && cachedSafe !== undefined) {
     safe = cachedSafe;
   } else {
-    const rendered = String(await processor.process(markdown));
+    const rendered = await renderMarkup(markdown);
     safe = DOMPurify.sanitize(rendered, {
       USE_PROFILES: { html: true, mathMl: true, svg: true },
       FORBID_TAGS: ["style", "form", "input", "button", "iframe", "object", "embed"],
