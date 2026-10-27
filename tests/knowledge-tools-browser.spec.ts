@@ -15,8 +15,33 @@ test("admin inserts a focused term note and previews the same terminology", asyn
   await page.locator("#knowledge-form button[type=submit]").click();
   await expect(editor).toHaveValue(/:term\[NameNode\]\{note="名称节点：负责命名空间和块元数据。"\}/u);
   const preview = page.frameLocator("#preview");
-  await expect(preview.locator(".term-note")).toBeVisible();
-  await expect(preview.locator(".term-note")).toHaveAttribute("data-note", "名称节点：负责命名空间和块元数据。");
+  const trigger = preview.locator(".term-note__trigger");
+  const panel = preview.locator(".term-note__panel");
+  await expect(trigger).toBeVisible();
+  await expect(panel).toHaveText("名称节点：负责命名空间和块元数据。");
+  await expect(panel).toHaveCSS("visibility", "hidden");
+
+  // Regression: the tooltip must stay open after moving from the word to the
+  // card, not vanish when pointer leaves the word.
+  await trigger.hover();
+  await expect(panel).toHaveCSS("visibility", "visible");
+  await panel.hover();
+  await expect(panel).toHaveCSS("visibility", "visible");
+  await expect(panel).toHaveCSS("user-select", "text");
+  await expect(panel).toHaveCSS("pointer-events", "auto");
+
+  // Verify native drag selection rather than merely checking a CSS class.
+  const rect = await panel.boundingBox();
+  expect(rect).not.toBeNull();
+  if (rect) {
+    await page.mouse.move(rect.x + 20, rect.y + 22);
+    await page.mouse.down();
+    await page.mouse.move(rect.x + Math.min(rect.width - 20, 125), rect.y + 22, { steps: 6 });
+    await page.mouse.up();
+    const selected = await panel.evaluate(element => element.ownerDocument.getSelection()?.toString() ?? "");
+    expect(selected.length).toBeGreaterThan(0);
+    await expect(panel).toHaveCSS("visibility", "visible");
+  }
 });
 
 test("admin creates only safe prototype cards", async ({ page }) => {
