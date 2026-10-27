@@ -380,8 +380,10 @@ function schedulePreview() {
         lastRenderedSource = source;
         frame.srcdoc = html;
       })
-      .catch(() => {
-        if (version === previewVersion) notice("预览渲染失败；正文仍保留，请保存草稿。", true);
+      .catch((error: unknown) => {
+        if (version !== previewVersion) return;
+        console.error("[preview-render-error]", error instanceof Error ? error.message : String(error));
+        notice("预览渲染失败；正文仍保留，请保存草稿。", true);
       });
   }, 120);
 }
