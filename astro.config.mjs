@@ -4,6 +4,7 @@ import rehypeKatex from "rehype-katex";
 import remarkDirective from "remark-directive";
 import remarkMath from "remark-math";
 import remarkContentBlocks from "./src/plugins/remark-content-blocks.mjs";
+import remarkKnowledgeTools from "./src/plugins/remark-knowledge-tools.mjs";
 
 export default defineConfig({
   site: "https://y4ho0.github.io",
@@ -16,7 +17,7 @@ export default defineConfig({
   vite: { build: { assetsInlineLimit: (filePath) => filePath.endsWith(".js") ? false : undefined } },
   markdown: {
     processor: unified({
-      remarkPlugins: [remarkMath, remarkDirective, remarkContentBlocks],
+      remarkPlugins: [remarkMath, remarkDirective, remarkContentBlocks, remarkKnowledgeTools],
       rehypePlugins: [[rehypeKatex, { output: "htmlAndMathml", trust: false, strict: "warn" }]],
     }),
     shikiConfig: {
