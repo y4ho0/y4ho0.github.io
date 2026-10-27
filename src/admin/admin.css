@@ -131,7 +131,7 @@ details[open] > label { margin-top:.8rem; }
 .shortcut-actions { flex-shrink:0; justify-content:space-between; }
 @media(max-width:640px) { .shortcut-grid { grid-template-columns:minmax(0,1fr); } .format-toolbar { padding:.5rem; gap:.4rem; } }
 #editor-tabs { display:flex; gap:.5rem; padding-bottom:.6rem; }
-.writing-area { --split:50%; display:grid; grid-template-columns:minmax(0,var(--split)) .6rem minmax(0,1fr); height:36rem; border:1px solid var(--color-border); border-radius:.4rem; overflow:hidden; }
+.writing-area { --split:50%; display:grid; grid-template-columns:minmax(0,var(--split)) .6rem minmax(0,1fr); height:clamp(46rem, 79dvh, 74rem); border:1px solid var(--color-border); border-radius:.4rem; overflow:hidden; }
 #edit-pane,#preview-pane { min-width:0; height:100%; overflow:hidden; }
 #markdown { width:100%; height:100%; resize:none; margin:0; border:0; border-radius:0; padding:1rem; font:.9rem/1.75 ui-monospace,SFMono-Regular,Menlo,monospace; tab-size:2; overflow:auto; }
 #preview { width:100%; height:100%; border:0; background:var(--color-surface-raised); }
@@ -139,6 +139,23 @@ details[open] > label { margin-top:.8rem; }
 #splitter:focus-visible { outline-offset:-2px; }
 .writing-area[data-layout=tabs] { display:block; }
 .writing-area[data-layout=tabs] #splitter { display:none; }
+/* Edit in a spacious, independently scrollable textarea. In the standalone
+   preview, let the iframe grow with the entire document and scroll the page. */
+.writing-area[data-layout=tabs][data-tab=edit] { height:clamp(46rem, 82dvh, 76rem); }
+.writing-area[data-layout=tabs][data-tab=preview] {
+  height:auto;
+  overflow:visible;
+}
+.writing-area[data-layout=tabs][data-tab=preview] #preview-pane {
+  height:auto;
+  overflow:visible;
+}
+.writing-area[data-layout=tabs][data-tab=preview] #preview {
+  display:block;
+  height:48rem; /* safe fallback until the isolated preview reports its size */
+  min-height:40rem;
+}
+
 .writing-area[data-layout=tabs][data-tab=edit] #preview-pane,.writing-area[data-layout=tabs][data-tab=preview] #edit-pane { display:none; }
 .preview-help { margin:.65rem 0; }
 .media-dropzone { border:1px dashed var(--color-moss); border-radius:.6rem; padding:1rem; margin:.7rem 0; background:color-mix(in srgb,var(--color-primary) 5%,var(--color-surface-raised)); }
@@ -161,4 +178,4 @@ dialog::backdrop { background:rgb(0 0 0 / 35%); }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 @media(max-width:1000px) { .workspace { grid-template-columns:14rem minmax(0,1fr); } .admin-main { padding:1rem; } }
 @media(max-width:760px) { .admin-header { align-items:flex-start; flex-wrap:wrap; } .admin-header-actions { width:100%; justify-content:space-between; } }
-@media(max-width:760px) { .workspace { grid-template-columns:1fr; } .admin-header { padding:1rem; } .library .item-list { max-height:13rem; } .library-summary { margin-bottom:0; } .library details[open] > summary { margin-bottom:.8rem; } .field-row,.metadata-primary { grid-template-columns:1fr; gap:0; } .auth-panel,#login-form { display:block; } .auth-panel button { margin-top:.4rem; } #token { min-width:0; } .writing-area { height:30rem; } .section-top { flex-wrap:wrap; } .editor-toolbar > div { width:100%; } .editor-toolbar > div button { flex:1; } .metadata-settings > summary span { display:block; margin-left:1rem; } }
+@media(max-width:760px) { .workspace { grid-template-columns:1fr; } .admin-header { padding:1rem; } .library .item-list { max-height:13rem; } .library-summary { margin-bottom:0; } .library details[open] > summary { margin-bottom:.8rem; } .field-row,.metadata-primary { grid-template-columns:1fr; gap:0; } .auth-panel,#login-form { display:block; } .auth-panel button { margin-top:.4rem; } #token { min-width:0; } .writing-area { height:clamp(36rem, 76dvh, 62rem); } .section-top { flex-wrap:wrap; } .editor-toolbar > div { width:100%; } .editor-toolbar > div button { flex:1; } .metadata-settings > summary span { display:block; margin-left:1rem; } }
