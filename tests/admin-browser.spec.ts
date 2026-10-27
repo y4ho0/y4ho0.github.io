@@ -320,18 +320,22 @@ test("admin shares the homepage theme preference without disturbing writing or p
   expect(colors.pickerBackground).toBeLessThan(.1);
   expect(colors.pickerContrast).toBeGreaterThanOrEqual(4.5);
   expect(colors.preference).toBe("dark");
-  const previewColors = await preview.locator(".hljs-keyword").evaluate(element => {
-    const rgb = (value: string) => (value.match(/[\d.]+/gu) ?? []).slice(0, 3).map(Number);
-    const luminance = (value: string) => rgb(value).map(channel => {
-      const linear = channel / 255;
-      return linear <= .04045 ? linear / 12.92 : ((linear + .055) / 1.055) ** 2.4;
-    }).reduce((total, channel, index) => total + channel * [.2126, .7152, .0722][index], 0);
-    const foreground = luminance(getComputedStyle(element).color);
-    const background = luminance(getComputedStyle(element.closest("pre")!).backgroundColor);
-    return { body: luminance(getComputedStyle(document.body).backgroundColor), contrast: (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05) };
-  });
-  expect(previewColors.body).toBeLessThan(.1);
-  expect(previewColors.contrast).toBeGreaterThanOrEqual(4.5);
+  // The sandbox follows the iframe color scheme on its own render schedule.
+  // Its palette can still be easing after the parent's transition marker clears.
+  await expect(async () => {
+    const previewColors = await preview.locator(".hljs-keyword").evaluate(element => {
+      const rgb = (value: string) => (value.match(/[\d.]+/gu) ?? []).slice(0, 3).map(Number);
+      const luminance = (value: string) => rgb(value).map(channel => {
+        const linear = channel / 255;
+        return linear <= .04045 ? linear / 12.92 : ((linear + .055) / 1.055) ** 2.4;
+      }).reduce((total, channel, index) => total + channel * [.2126, .7152, .0722][index], 0);
+      const foreground = luminance(getComputedStyle(element).color);
+      const background = luminance(getComputedStyle(element.closest("pre")!).backgroundColor);
+      return { body: luminance(getComputedStyle(document.body).backgroundColor), contrast: (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05) };
+    });
+    expect(previewColors.body).toBeLessThan(.1);
+    expect(previewColors.contrast).toBeGreaterThanOrEqual(4.5);
+  }).toPass({ timeout: 5_000 });
   await expect(page.locator("#markdown")).toHaveValue(body);
   expect(await page.locator("#markdown").evaluate((element: HTMLTextAreaElement) => ({
     sameNode: (window as any).__themeEditor === element,
