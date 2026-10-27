@@ -242,6 +242,8 @@ try { const value = localStorage.getItem("garden-admin-layout"); if (value === "
 let selectedTab: "edit" | "preview" = "edit";
 let fullPreview = false;
 let previewControlToken = "";
+let lastRenderedSource: string | undefined;
+let measuredFullHeight = 768;
 let appliedFromPreview: number | null = null;
 let editorScrollPending = false;
 const splitActive = () => el("writing-area").dataset.layout === "split";
@@ -274,8 +276,19 @@ editor.addEventListener("scroll", () => {
   });
 }, { passive: true });
 
-el<HTMLIFrameElement>("preview").addEventListener("load", () => {
-  // Any re-render replaces the sandbox document and resets its scroll range.
+const previewFrame = el<HTMLIFrameElement>("preview");
+const sendPreviewMode = () => {
+  if (!previewControlToken) return;
+  previewFrame.contentWindow?.postMessage({
+    type: "garden:preview-mode",
+    token: previewControlToken,
+    mode: fullPreview ? "full" : "split",
+  }, "*");
+};
+previewFrame.addEventListener("load", () => {
+  // A new HTML render resets its scroll range, but tab switches now preserve
+  // the same iframe and only update its trusted mode channel.
+  sendPreviewMode();
   if (splitActive()) sendEditorProgress();
 });
 
@@ -292,7 +305,8 @@ window.addEventListener("message", (event: MessageEvent) => {
   if (report.type === "garden:preview-height" && fullPreview) {
     if (typeof report.height !== "number" || !Number.isFinite(report.height)
       || report.height < 0) return;
-    frame.style.height = String(Math.max(640, Math.min(200000, Math.ceil(report.height)))) + "px";
+    measuredFullHeight = Math.max(640, Math.min(200000, Math.ceil(report.height)));
+    frame.style.height = String(measuredFullHeight) + "px";
   } else if (report.type === "garden:scroll-position" && splitActive() && !fullPreview) {
     if (typeof report.progress !== "number" || !Number.isFinite(report.progress)
       || report.progress < 0 || report.progress > 1) return;
@@ -315,8 +329,11 @@ function applyLayout(focus = false) {
   if (fullPreview !== shouldExpand) {
     fullPreview = shouldExpand;
     const frame = el<HTMLIFrameElement>("preview");
-    frame.style.height = shouldExpand ? "48rem" : "";
-    schedulePreview();
+    // Reuse the existing sanitized document. Rebuilding srcdoc on every tab
+    // switch reparses CSS/fonts/long articles and blocks visible controls.
+    frame.style.height = shouldExpand ? String(measuredFullHeight) + "px" : "";
+    sendPreviewMode();
+    if (!shouldExpand) sendEditorProgress();
   }
 }
 for (const layout of ["split", "tabs"] as const) el(`layout-${layout}`).onclick = () => {
@@ -346,19 +363,27 @@ function schedulePreview() {
   window.clearTimeout(previewTimer);
   const version = ++previewVersion;
   const source = editor.value;
+  // The first preview is kept alive in every layout. A switch of layout, tab
+  // or theme must never re-render an unchanged Markdown document.
+  if (previewControlToken && source === lastRenderedSource) return;
   previewTimer = window.setTimeout(() => {
+    if (version !== previewVersion) return;
     const frame = el<HTMLIFrameElement>("preview");
     const token = crypto.randomUUID();
     const mode = fullPreview ? "full" : "split";
-    // Trusted height/scroll bridge only, isolated in an opaque-origin frame:
-    // no same-origin access, arbitrary article scripts, forms or credentials.
     frame.setAttribute("sandbox", "allow-scripts");
-    previewControlToken = token;
     void import("./preview")
       .then(({ previewDocument }) => previewDocument(source, token, mode))
-      .then(html => { if (version === previewVersion) frame.srcdoc = html; })
-      .catch(() => notice("预览渲染失败；正文仍保留，请保存草稿。", true));
-  }, 180);
+      .then(html => {
+        if (version !== previewVersion) return;
+        previewControlToken = token;
+        lastRenderedSource = source;
+        frame.srcdoc = html;
+      })
+      .catch(() => {
+        if (version === previewVersion) notice("预览渲染失败；正文仍保留，请保存草稿。", true);
+      });
+  }, 120);
 }
 function changed() {
   revision++; dirty = true; syncFromForm(); updateControls();
