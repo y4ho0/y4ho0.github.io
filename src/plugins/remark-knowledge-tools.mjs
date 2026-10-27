@@ -11,7 +11,14 @@ export default function remarkKnowledgeTools() {
       const term = node.children.map(item => item.type === "text" ? item.value : "").join("").trim();
       const note = node.attributes?.note?.trim() ?? "";
       if (!term || term.length > 80 || !note || note.length > 320
-        || /[<>"\u0000-\u001f]/u.test(term + note)) return;
+        || /[<>"\u0000-\u001f]/u.test(term + note)) {
+        // Invalid or untrusted notes degrade to plain inline text.
+        const data = node.data || (node.data = {});
+        data.hName = "span";
+        data.hProperties = {};
+        node.children = [{ type: "text", value: term }];
+        return;
+      }
       const data = node.data || (node.data = {});
       data.hName = "span";
       data.hProperties = {
