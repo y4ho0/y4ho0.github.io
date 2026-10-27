@@ -128,6 +128,19 @@ NoSQL 也不是单一的一致性类别。应区分 ACID 的事务语义、CAP �
 
 > 此课程目前处于 growing 阶段。它建立概念地图与阅读顺序，而不是宣称所有主题已有完整实测数据。
 
+## 讲义内容与专题的对应关系
+
+| 内容来源 | 课程主线及专题 | 额外核对 |
+| --- | --- | --- |
+| 第 1 章 大数据概述、第 8 章 大数据应用 | 《从数据规模到计算模型》、数据工程与系统选型 | 批、流、图、交互分析的实际工作负载 |
+| 第 2 章 Hadoop | 《从零理解 Hadoop 的系统边界》、运行模式及虚拟机实验 | HDFS/MapReduce/YARN 的版本与职责 |
+| 第 3 章 HDFS | 《HDFS 从文件读写到故障恢复》、元数据、块、副本与小文件专题 | HDFS 2.7.1 官方设计与只读实测 |
+| 第 4 章 HBase | 《从 HDFS 到 HBase》、RowKey、Region、WAL、MemStore、HFile | HBase 1.1.5 的 Region 定位及实验三 |
+| 第 5 章 NoSQL 数据库 | 《讨论 NoSQL 的一致性，为什么不能只背 CAP 和 BASE？》 | ACID/CAP 的含义与 quorum 的前提 |
+| 第 6 章 MapReduce、第 7 章 Hadoop 架构再探讨 | 《从 InputSplit 到 YARN》、Shuffle 与任务调度 | Hadoop 1.x/2.x 架构分界，运行日志验证 |
+
+补充参考其他公开计算机科学课程时，会按实际引用的内容在具体文章中列出出处。例如 MIT [6.5840 Distributed Systems](https://pdos.csail.mit.edu/6.5840/)、CMU [15-445 Database Systems](https://15445.courses.cs.cmu.edu/) 与 Stanford [CS246 Mining Massive Datasets](https://web.stanford.edu/class/cs246/)。这些课程主要用于理论深化与不同讲法对照，不代表已完成相应课程作业。
+
 ## 资料来源与版本说明
 
 - 《云计算与大数据》讲义：大数据概述、Hadoop、HDFS、HBase、NoSQL、MapReduce、Hadoop 架构演进、大数据应用。文件名为“第8章-大数据应用”的材料，原幻灯片封面标为“第14章”，因此此处按**主题**而非文件编号整理。
