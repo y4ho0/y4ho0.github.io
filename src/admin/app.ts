@@ -240,6 +240,23 @@ applyLibrary();
 let preference: "split" | "tabs" | null = null;
 try { const value = localStorage.getItem("garden-admin-layout"); if (value === "split" || value === "tabs") preference = value; } catch { /* Storage may be disabled. */ }
 let selectedTab: "edit" | "preview" = "edit";
+let fullPreview = false;
+let previewHeightToken = "";
+// The standalone iframe is always opaque-origin: verify the window and the
+// unguessable per-render token before accepting a height-only message.
+window.addEventListener("message", (event: MessageEvent) => {
+  const frame = el<HTMLIFrameElement>("preview");
+  if (!fullPreview || event.source !== frame.contentWindow || event.origin !== "null") return;
+  const data: unknown = event.data;
+  if (!data || typeof data !== "object" || Array.isArray(data)) return;
+  const report = data as Record<string, unknown>;
+  if (report.type !== "garden:preview-height" || report.token !== previewHeightToken) return;
+  if (typeof report.height !== "number" || !Number.isFinite(report.height)
+    || report.height < 0) return;
+  // Bounds avoid an untrusted frame creating an unbounded page or a tiny trap.
+  frame.style.height = `${Math.max(640, Math.min(200000, Math.ceil(report.height)))}px`;
+});
+
 function applyLayout(focus = false) {
   const layout = narrow.matches ? "tabs" : preference ?? "split";
   el("writing-area").dataset.layout = layout;
@@ -250,6 +267,13 @@ function applyLayout(focus = false) {
   el("tab-edit").setAttribute("aria-selected", String(selectedTab === "edit"));
   el("tab-preview").setAttribute("aria-selected", String(selectedTab === "preview"));
   if (layout === "split" || selectedTab === "edit") restorePosition(focus);
+  const shouldExpand = layout === "tabs" && selectedTab === "preview";
+  if (fullPreview !== shouldExpand) {
+    fullPreview = shouldExpand;
+    const frame = el<HTMLIFrameElement>("preview");
+    frame.style.height = shouldExpand ? "48rem" : "";
+    schedulePreview();
+  }
 }
 for (const layout of ["split", "tabs"] as const) el(`layout-${layout}`).onclick = () => {
   if (el("writing-area").dataset.layout === "split" || selectedTab === "edit") rememberPosition();
@@ -279,7 +303,17 @@ function schedulePreview() {
   const version = ++previewVersion;
   const source = editor.value;
   previewTimer = window.setTimeout(() => {
-    void import("./preview").then(({ previewDocument }) => previewDocument(source)).then(html => { if (version === previewVersion) el<HTMLIFrameElement>("preview").srcdoc = html; }).catch(() => notice("预览渲染失败；正文仍保留，请保存草稿。", true));
+    const frame = el<HTMLIFrameElement>("preview");
+    const token = fullPreview ? crypto.randomUUID() : undefined;
+    // The original split preview never runs a script. Only the full-page
+    // standalone preview runs the repository-owned height reporter, isolated
+    // without allow-same-origin or access to the parent DOM/credentials.
+    frame.setAttribute("sandbox", token ? "allow-scripts" : "");
+    previewHeightToken = token ?? "";
+    void import("./preview")
+      .then(({ previewDocument }) => previewDocument(source, token))
+      .then(html => { if (version === previewVersion) frame.srcdoc = html; })
+      .catch(() => notice("预览渲染失败；正文仍保留，请保存草稿。", true));
   }, 180);
 }
 function changed() {
