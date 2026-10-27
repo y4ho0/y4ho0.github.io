@@ -1,4 +1,5 @@
 import DOMPurify from "dompurify";
+import PreviewWorker from "./preview-worker?worker";
 import knowledgeStyles from "../styles/knowledge-tools.css?inline";
 import tokens from "../styles/tokens.css?inline";
 import prose from "../styles/prose.css?inline";
@@ -25,7 +26,7 @@ const waiting = new Map<number, { resolve: (html: string) => void; reject: (erro
 function renderMarkup(markdown: string): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!worker) {
-      worker = new Worker(new URL("./preview-worker.ts", import.meta.url), { type: "module" });
+      worker = new PreviewWorker();
       worker.addEventListener("message", (event: MessageEvent<{ id: number; html?: string; error?: string }>) => {
         const result = event.data;
         const request = waiting.get(result?.id);
