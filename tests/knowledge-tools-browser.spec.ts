@@ -21,23 +21,19 @@ test("admin inserts a focused term note and previews the same terminology", asyn
   await expect(panel).toHaveText("名称节点：负责命名空间和块元数据。");
   await expect(panel).toHaveCSS("visibility", "hidden");
 
-  // Regression: the tooltip must stay open after moving from the word to the
-  // card, not vanish when pointer leaves the word.
-  await trigger.hover();
-  await expect(panel).toHaveCSS("visibility", "visible");
-  // The preview deliberately executes no JS. Focus keeps the fixed card open
-  // while travelling to its safe on-screen position.
-  // The preview iframe is 36rem tall and can initially sit below the page
-  // viewport because of the metadata form. Scroll its full frame into view
-  // before trying to enter a fixed-to-iframe explanation.
+  // The parent admin page must scroll to reveal its full sandboxed iframe.
+  // No trigger click or JavaScript pin should be needed to hover into the card.
   await page.locator("#preview").scrollIntoViewIfNeeded();
-  await trigger.focus();
+  await trigger.hover({ timeout: 8000 });
+  await expect(panel).toHaveCSS("visibility", "visible");
+
   const geometry = await panel.evaluate(element => {
     const box = element.getBoundingClientRect();
     return { top: box.top, bottom: box.bottom, viewport: element.ownerDocument.defaultView!.innerHeight };
   });
   expect(geometry.top).toBeGreaterThanOrEqual(0);
   expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewport);
+  await panel.hover({ timeout: 8000 });
   await expect(panel).toHaveCSS("visibility", "visible");
   await expect(panel).toHaveCSS("user-select", "text");
   await expect(panel).toHaveCSS("pointer-events", "auto");
