@@ -78,3 +78,54 @@ test("HDFS demo uses no remote APIs and advances all four stages", async ({ page
   await expect(page.locator("#stage-count")).toHaveText("01 / 04");
   expect(outside).toEqual([]);
 });
+
+
+test("article reader pins a note while selecting, then closes outside or on Escape", async ({ page }) => {
+  let article = false;
+  for (const index of ["/garden/", "/labs/", "/essays/"]) {
+    await page.goto(index);
+    const link = page.locator(".content-card h2 a").first();
+    if (await link.count()) {
+      await link.click();
+      article = true;
+      break;
+    }
+  }
+  test.skip(!article, "No publicly published article is available for reader integration.");
+
+  // Inject a known-good rendered fixture into an existing article. The
+  // article's delegated listeners and real production CSS are already loaded.
+  await page.locator(".prose[data-pagefind-body]").evaluate(prose => {
+    const paragraph = document.createElement("p");
+    paragraph.innerHTML = '<span class="term-note"><span class="term-note__trigger" tabindex="0" role="button" aria-expanded="false">RPC</span><span class="term-note__panel" role="note">Remote Procedure Call，远程过程调用。允许进程通过网络请求其他服务。</span></span>';
+    prose.prepend(paragraph);
+  });
+  const term = page.locator(".term-note").first();
+  const trigger = term.locator(".term-note__trigger");
+  const panel = term.locator(".term-note__panel");
+
+  await trigger.hover();
+  await panel.hover();
+  await expect(panel).toHaveCSS("visibility", "visible");
+  await panel.click();
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+  const rect = await panel.boundingBox();
+  expect(rect).not.toBeNull();
+  if (rect) {
+    await page.mouse.move(rect.x + 22, rect.y + 25);
+    await page.mouse.down();
+    await page.mouse.move(rect.x + 145, rect.y + 25, { steps: 8 });
+    await page.mouse.up();
+  }
+  const selection = await panel.evaluate(element => element.ownerDocument.getSelection()?.toString() ?? "");
+  expect(selection.length).toBeGreaterThan(0);
+  await expect(panel).toHaveCSS("visibility", "visible");
+
+  await page.locator(".article-header h1").click();
+  await expect(panel).toHaveCSS("visibility", "hidden");
+  await trigger.focus();
+  await expect(panel).toHaveCSS("visibility", "visible");
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCSS("visibility", "hidden");
+});
