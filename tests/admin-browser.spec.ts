@@ -525,6 +525,74 @@ test("tab switching keeps one editor, text, selection and scroll; narrow screens
   await expect(page.locator("#markdown")).toHaveValue(body);
 });
 
+test("split panes are taller, and standalone preview expands to the entire sanitized article", async ({ page }) => {
+  await mockGitHub(page); await openAdmin(page);
+  const area = page.locator("#writing-area");
+  const frame = page.locator("#preview");
+  const source = [
+    "## Full-length preview",
+    ...Array.from({ length: 95 }, (_, index) =>
+      "\n\n### Section " + index + "\n\n" +
+      "This paragraph verifies the full height of a long article and keeps the preview in its own opaque-origin sandbox."),
+  ].join("");
+  await page.locator("#markdown").fill(source);
+  const splitHeight = await area.evaluate(element => element.getBoundingClientRect().height);
+  expect(splitHeight).toBeGreaterThan(690);
+  await expect(frame).toHaveAttribute("sandbox", "");
+  await page.locator("#layout-tabs").click();
+  await page.locator("#tab-preview").click();
+  await expect(area).toHaveAttribute("data-tab", "preview");
+  await expect(frame).toHaveAttribute("sandbox", "allow-scripts");
+  await expect(page.frameLocator("#preview").getByRole("heading", { name: "Full-length preview" })).toBeVisible();
+  await expect(page.frameLocator("#preview").locator("script[src]")).toHaveCount(1);
+  await expect(page.frameLocator("#preview").locator("script[src]")).toHaveAttribute("src", /\/admin\/preview-height\.js$/u);
+  // A measured height, not an estimate from Markdown length. The whole
+  // document scrolls through the parent page without a short nested viewport.
+  await expect.poll(async () => frame.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThan(1800);
+  const measurements = await page.evaluate(() => {
+    const area = document.getElementById("writing-area")!;
+    const frame = document.getElementById("preview") as HTMLIFrameElement;
+    return {
+      outerHeight: area.getBoundingClientRect().height,
+      frameHeight: frame.getBoundingClientRect().height,
+      pageOverflow: document.documentElement.scrollHeight > innerHeight,
+      iframeOriginIsOpaque: (() => { try { return frame.contentDocument === null; } catch { return true; } })(),
+      overflow: getComputedStyle(area).overflow,
+    };
+  });
+  expect(measurements.outerHeight).toBeGreaterThan(1800);
+  expect(measurements.frameHeight).toBeGreaterThan(1800);
+  expect(measurements.pageOverflow).toBe(true);
+  expect(measurements.iframeOriginIsOpaque).toBe(true);
+  expect(measurements.overflow).toBe("visible");
+
+  await page.locator("#tab-edit").click();
+  await expect(page.locator("#markdown")).toHaveValue(source);
+  await expect(frame).toHaveAttribute("sandbox", "");
+  const tabEditHeight = await area.evaluate(element => element.getBoundingClientRect().height);
+  expect(tabEditHeight).toBeGreaterThan(690);
+  await page.locator("#layout-split").click();
+  await expect(area).toHaveAttribute("data-layout", "split");
+  await expect(frame).toHaveAttribute("sandbox", "");
+});
+
+test("standalone preview adapts to a narrow screen without horizontal overflow", async ({ page }) => {
+  await mockGitHub(page); await openAdmin(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const area = page.locator("#writing-area");
+  await expect(area).toHaveAttribute("data-layout", "tabs");
+  const initialHeight = await area.evaluate(element => element.getBoundingClientRect().height);
+  expect(initialHeight).toBeGreaterThan(520);
+  await page.locator("#markdown").fill(
+    ["## Mobile long-form preview", ...Array.from({length: 55}, (_, i) =>
+      "\n\nParagraph " + i + ": 这是为了检验窄屏的长文章预览能够自然向下展开，不再只能在固定的小窗口中滚动。")].join(""),
+  );
+  await page.locator("#tab-preview").click();
+  await expect(page.locator("#preview")).toHaveAttribute("sandbox", "allow-scripts");
+  await expect.poll(async () => page.locator("#preview").evaluate(el => el.getBoundingClientRect().height)).toBeGreaterThan(1400);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test("creating an article requires confirmation and sends valid Markdown only after approval", async ({ page }) => {
   const api = await mockGitHub(page); await openAdmin(page); await login(page);
   await page.locator('[name="title"]').fill("New article");
