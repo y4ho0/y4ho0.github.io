@@ -33,7 +33,7 @@ HDFS 的 :term[NameNode]{note="负责命名空间和块元数据，不转发全�
 
 这会显示一个带标题和说明的普通链接卡片。只允许 HTTPS 地址或者本站以单个斜线开头的绝对路径，阻止 javascript:、data:、file:、protocol-relative（双斜线）链接。
 
-**不允许在编辑器或阅读页面内通过本功能执行远端 JavaScript、第三方 iframe、任意 HTML 或后台脚本。** 文章预览继续使用现有的严格沙盒 iframe，禁用脚本和表单。外部链接使用新窗口与 noopener/noreferrer；读者只在主动点击之后离开本站。
+**不允许通过术语/原型功能执行第三方 JavaScript、第三方 iframe 或任意 HTML。** 后台预览仍是 opaque-origin iframe（无 `allow-same-origin`），内容经过 HTML 清理，CSP 仅允许运行本站固定 `/admin/preview-height.js`。该脚本只汇报完整预览的高度或左右对照的滚动进度（0–1），不读取/发送文章正文、GitHub Token 等数据，也不能访问父页面 DOM。原型卡片继续只提供安全链接。
 
 ### 为什么不做真正的“拖拽式原型编辑器”？
 

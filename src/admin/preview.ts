@@ -50,27 +50,27 @@ const processor = unified().use(remarkParse).use(remarkGfm).use(remarkMath).use(
   .use(rehypeKatex, { trust: false, strict: "warn", output: "htmlAndMathml" })
   .use(rehypeHighlight, { detect: false, ignoreMissing: true }).use(taskMarkers).use(rehypeStringify);
 
-export async function previewDocument(markdown: string, heightToken?: string): Promise<string> {
+export async function previewDocument(markdown: string, controlToken?: string, mode: "full" | "split" = "full"): Promise<string> {
   const rendered = String(await processor.process(markdown));
   const safe = DOMPurify.sanitize(rendered, {
     USE_PROFILES: { html: true, mathMl: true, svg: true },
     FORBID_TAGS: ["style", "form", "input", "button", "iframe", "object", "embed"],
     FORBID_ATTR: ["id", "name"],
   });
-  // Split mode stays scriptless. Only standalone preview loads a fixed,
-  // repository-owned measurement script inside an opaque-origin sandbox.
-  // The parent checks the window source and per-render token before resizing.
-  // Markdown is still sanitized; it cannot provide arbitrary executable code.
-  const standalone = Boolean(heightToken && /^[a-f0-9-]{36}$/u.test(heightToken));
+  // Only a fixed repository-owned script may run in the opaque-origin
+  // sandbox. It reports full-mode height or split-mode scroll progress;
+  // Markdown remains sanitized, cannot run scripts, and cannot access parent.
+  const enabled = Boolean(controlToken && /^[a-f0-9-]{36}$/u.test(controlToken));
   const origin = window.location.origin;
-  const scriptPolicy = standalone ? "script-src " + origin + "/admin/preview-height.js" : "script-src 'none'";
-  const heightMeta = standalone ? '<meta name="garden-preview-token" content="' + heightToken + '">' : "";
-  const heightScript = standalone ? '<script src="' + origin + '/admin/preview-height.js" defer></script>' : "";
-  // No allow-same-origin, navigation, form submission, or storage access.
-  // The restrictive content policy is separate from the iframe sandbox.
+  const controlScriptUrl = origin + "/admin/preview-height.js";
+  const scriptPolicy = enabled ? "script-src " + controlScriptUrl : "script-src 'none'";
+  const controlMeta = enabled
+    ? '<meta name="garden-preview-token" content="' + controlToken + '" data-preview-mode="' + mode + '">'
+    : "";
+  const controlScript = enabled ? '<script src="' + controlScriptUrl + '" defer></script>' : "";
 
   // Styles are imported at build time; no remote rendering service is used.
   // Embedded media queries follow the parent iframe's color-scheme. Theme
   // switching updates this scriptless sandbox without reloading its document.
-  return `<!doctype html><html lang="zh-CN" data-theme-preview><head><meta charset="utf-8"><meta name="referrer" content="no-referrer">${heightMeta}<meta http-equiv="Content-Security-Policy" content="default-src 'none'; ${scriptPolicy}; style-src 'unsafe-inline'; img-src https: data: ${origin}; font-src data: ${origin}; connect-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'"><style>${tokens}\n${themeMotion}\n${wenkai}\n${wenkaiUi}\n${prose}\n${knowledgeStyles}\n${katex}\n${highlighting}\n@media(prefers-color-scheme:dark){${darkHighlighting}}\n*{box-sizing:border-box}body{margin:0;padding:1.5rem;background:var(--color-surface-raised);font-family:var(--font-body)}.prose{width:100%;overflow-wrap:anywhere}.prose pre code.hljs{background:transparent;padding:0}img{max-width:100%}table{display:block;overflow:auto}pre{white-space:pre-wrap}h1{font-size:2rem}</style></head><body><article class="prose">${safe}</article>${heightScript}</body></html>`;
+  return `<!doctype html><html lang="zh-CN" data-theme-preview><head><meta charset="utf-8"><meta name="referrer" content="no-referrer">${controlMeta}<meta http-equiv="Content-Security-Policy" content="default-src 'none'; ${scriptPolicy}; style-src 'unsafe-inline'; img-src https: data: ${origin}; font-src data: ${origin}; connect-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'"><style>${tokens}\n${themeMotion}\n${wenkai}\n${wenkaiUi}\n${prose}\n${knowledgeStyles}\n${katex}\n${highlighting}\n@media(prefers-color-scheme:dark){${darkHighlighting}}\n*{box-sizing:border-box}body{margin:0;padding:1.5rem;background:var(--color-surface-raised);font-family:var(--font-body)}.prose{width:100%;overflow-wrap:anywhere}.prose pre code.hljs{background:transparent;padding:0}img{max-width:100%}table{display:block;overflow:auto}pre{white-space:pre-wrap}h1{font-size:2rem}</style></head><body><article class="prose">${safe}</article>${controlScript}</body></html>`;
 }

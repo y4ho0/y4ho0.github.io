@@ -288,6 +288,16 @@ test("admin shares the homepage theme preference without disturbing writing or p
     return document.scrollingElement!.scrollTop;
   });
   expect(previewScroll).toBeGreaterThan(0);
+  // Split panes are now intentionally linked, so the second scroll updates
+  // the Markdown position; retain that settled position across theme changes.
+  const targetProgress = await preview.locator("body").evaluate(() => {
+    const node = document.scrollingElement!;
+    return node.scrollTop / Math.max(1, node.scrollHeight - node.clientHeight);
+  });
+  await expect.poll(async () => page.locator("#markdown").evaluate((element: HTMLTextAreaElement) =>
+    element.scrollTop / Math.max(1, element.scrollHeight - element.clientHeight)
+  )).toBeGreaterThan(targetProgress - .025);
+  const syncedScroll = await page.locator("#markdown").evaluate((element: HTMLTextAreaElement) => element.scrollTop);
 
   await theme("dark").click();
   await expect(root).toHaveAttribute("data-theme", "dark");
@@ -340,7 +350,7 @@ test("admin shares the homepage theme preference without disturbing writing or p
   expect(await page.locator("#markdown").evaluate((element: HTMLTextAreaElement) => ({
     sameNode: (window as any).__themeEditor === element,
     start: element.selectionStart, end: element.selectionEnd, direction: element.selectionDirection, scroll: element.scrollTop,
-  }))).toEqual({ sameNode: true, ...writing });
+  }))).toEqual({ sameNode: true, ...writing, scroll: syncedScroll });
   expect(await preview.locator("body").evaluate(() => document.scrollingElement!.scrollTop)).toBe(previewScroll);
 
   await page.reload();
@@ -438,9 +448,12 @@ test("split preview renders GFM, highlighted code and math while hostile HTML ca
   expect(mathFonts.family).toContain("KaTeX_Math");
   const renderedMathFonts = await actualGlyphFonts(page, preview.locator(".mathnormal").first());
   expect(renderedMathFonts.some(font => font.isCustomFont && font.familyName === "KaTeX_Math")).toBe(true);
-  await expect(preview.locator("script,[onerror],a[href^='javascript:']")).toHaveCount(0);
+  await expect(preview.locator("script:not([src$='/admin/preview-height.js']),[onerror],a[href^='javascript:']")).toHaveCount(0);
+  // The only script permitted by CSP is our fixed scroll bridge; article
+  // markup and inline event handlers must remain inert and sanitized.
+  await expect(preview.locator("script[src$='/admin/preview-height.js']")).toHaveCount(1);
   expect(await page.evaluate(() => (window as any).__adminXss)).toBe(0);
-  await expect(page.locator("#preview")).toHaveAttribute("sandbox", "");
+  await expect(page.locator("#preview")).toHaveAttribute("sandbox", "allow-scripts");
   const separator = page.locator("#splitter");
   await separator.focus(); await page.keyboard.press("ArrowRight");
   await expect(separator).toHaveAttribute("aria-valuenow", "52");
@@ -494,6 +507,68 @@ test("preview uses the self-hosted Chinese body font across formatting while cod
   expect(fontErrors).toEqual([]);
 });
 
+test("split and tabbed editor start with exactly the same pane height", async ({ page }) => {
+  await mockGitHub(page); await openAdmin(page);
+  await expect(page.locator("#writing-area")).toHaveAttribute("data-layout", "split");
+  const split = await page.locator("#writing-area").evaluate(node => node.getBoundingClientRect().height);
+  await page.locator("#layout-tabs").click();
+  const tab = await page.locator("#writing-area").evaluate(node => node.getBoundingClientRect().height);
+  expect(Math.abs(split - tab)).toBeLessThanOrEqual(1);
+  await page.locator("#layout-split").click();
+  expect(await page.locator("#writing-area").evaluate(node => node.getBoundingClientRect().height)).toBeCloseTo(split, 0);
+});
+
+test("split scrolling follows in both directions without echo loops", async ({ page }) => {
+  await mockGitHub(page); await openAdmin(page);
+  const editor = page.locator("#markdown");
+  const frame = page.locator("#preview");
+  const preview = page.frameLocator("#preview");
+  const source = ["## Synchronized preview", "",
+    ...Array.from({ length: 155 }, (_, i) => "### Heading " + i + "\n\n" +
+      "This is a paragraph to create different Markdown and rendered scroll lengths. 保留进度比例。\n\n")].join("\n");
+  await editor.fill(source);
+  await expect(preview.getByRole("heading", { name: "Synchronized preview" })).toBeVisible();
+  await expect(frame).toHaveAttribute("sandbox", "allow-scripts");
+  await expect(preview.locator('meta[name="garden-preview-token"]')).toHaveAttribute("data-preview-mode", "split");
+  const progress = () => editor.evaluate((node: HTMLTextAreaElement) =>
+    node.scrollTop / Math.max(1, node.scrollHeight - node.clientHeight));
+  const previewProgress = () => preview.locator("body").evaluate(() => {
+    const node = document.scrollingElement!;
+    return node.scrollTop / Math.max(1, node.scrollHeight - node.clientHeight);
+  });
+  const scrollEditor = (fraction: number) => editor.evaluate((node: HTMLTextAreaElement, p) => {
+    node.scrollTop = p * (node.scrollHeight - node.clientHeight);
+  }, fraction);
+  const scrollPreview = (fraction: number) => preview.locator("body").evaluate((_node, p) => {
+    const scrolling = document.scrollingElement!;
+    scrolling.scrollTop = p * (scrolling.scrollHeight - scrolling.clientHeight);
+  }, fraction);
+
+  // Markdown → rendered pane.
+  await scrollEditor(.62);
+  await expect.poll(async () => Math.abs(await previewProgress() - .62)).toBeLessThan(.025);
+  await expect.poll(async () => Math.abs(await progress() - .62)).toBeLessThan(.025);
+
+  // Rendered pane → Markdown. No bounce back to the previous position.
+  await scrollPreview(.25);
+  await expect.poll(async () => Math.abs(await progress() - .25)).toBeLessThan(.025);
+  await expect.poll(async () => Math.abs(await previewProgress() - .25)).toBeLessThan(.025);
+
+  // A later user scroll in the editor must still work after a remote update.
+  await scrollEditor(.8);
+  await expect.poll(async () => Math.abs(await previewProgress() - .8)).toBeLessThan(.025);
+  await page.locator("#layout-tabs").click();
+  await page.locator("#tab-preview").click();
+  await expect(preview.locator('meta[data-preview-mode="full"]')).toHaveCount(1);
+  await expect.poll(async () => frame.evaluate(node => node.getBoundingClientRect().height)).toBeGreaterThan(1800);
+  await page.locator("#tab-edit").click();
+  await expect(editor).toHaveValue(source);
+  await page.locator("#layout-split").click();
+  await expect(preview.locator('meta[data-preview-mode="split"]')).toHaveCount(1);
+  await scrollEditor(.45);
+  await expect.poll(async () => Math.abs(await previewProgress() - .45)).toBeLessThan(.025);
+});
+
 test("tab switching keeps one editor, text, selection and scroll; narrow screens restore wide preference", async ({ page }) => {
   await mockGitHub(page); await openAdmin(page);
   const body = Array.from({ length: 120 }, (_, index) => `Line ${index}: writing position`).join("\n");
@@ -538,7 +613,7 @@ test("split panes are taller, and standalone preview expands to the entire sanit
   await page.locator("#markdown").fill(source);
   const splitHeight = await area.evaluate(element => element.getBoundingClientRect().height);
   expect(splitHeight).toBeGreaterThan(690);
-  await expect(frame).toHaveAttribute("sandbox", "");
+  await expect(frame).toHaveAttribute("sandbox", "allow-scripts");
   await page.locator("#layout-tabs").click();
   await page.locator("#tab-preview").click();
   await expect(area).toHaveAttribute("data-tab", "preview");
@@ -568,12 +643,12 @@ test("split panes are taller, and standalone preview expands to the entire sanit
 
   await page.locator("#tab-edit").click();
   await expect(page.locator("#markdown")).toHaveValue(source);
-  await expect(frame).toHaveAttribute("sandbox", "");
+  await expect(frame).toHaveAttribute("sandbox", "allow-scripts");
   const tabEditHeight = await area.evaluate(element => element.getBoundingClientRect().height);
   expect(tabEditHeight).toBeGreaterThan(690);
   await page.locator("#layout-split").click();
   await expect(area).toHaveAttribute("data-layout", "split");
-  await expect(frame).toHaveAttribute("sandbox", "");
+  await expect(frame).toHaveAttribute("sandbox", "allow-scripts");
 });
 
 test("standalone preview adapts to a narrow screen without horizontal overflow", async ({ page }) => {

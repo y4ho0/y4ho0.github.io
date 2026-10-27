@@ -241,20 +241,64 @@ let preference: "split" | "tabs" | null = null;
 try { const value = localStorage.getItem("garden-admin-layout"); if (value === "split" || value === "tabs") preference = value; } catch { /* Storage may be disabled. */ }
 let selectedTab: "edit" | "preview" = "edit";
 let fullPreview = false;
-let previewHeightToken = "";
-// The standalone iframe is always opaque-origin: verify the window and the
-// unguessable per-render token before accepting a height-only message.
+let previewControlToken = "";
+let appliedFromPreview: number | null = null;
+let editorScrollPending = false;
+const splitActive = () => el("writing-area").dataset.layout === "split";
+const editorProgress = () => {
+  const length = Math.max(0, editor.scrollHeight - editor.clientHeight);
+  return length === 0 ? 0 : Math.max(0, Math.min(1, editor.scrollTop / length));
+};
+const sendEditorProgress = () => {
+  if (!splitActive() || !previewControlToken) return;
+  el<HTMLIFrameElement>("preview").contentWindow?.postMessage({
+    type: "garden:scroll-set", token: previewControlToken, progress: editorProgress(),
+  }, "*"); // opaque-origin iframe; targetOrigin cannot be an ordinary site origin
+};
+
+editor.addEventListener("scroll", () => {
+  if (!splitActive() || !previewControlToken) return;
+  const progress = editorProgress();
+  // Ignore the position set by the preview, while still allowing the next
+  // user-initiated wheel, arrow-key or scrollbar drag to flow back.
+  if (appliedFromPreview !== null && Math.abs(progress - appliedFromPreview) < .012) {
+    appliedFromPreview = null;
+    return;
+  }
+  appliedFromPreview = null;
+  if (editorScrollPending) return;
+  editorScrollPending = true;
+  requestAnimationFrame(() => {
+    editorScrollPending = false;
+    sendEditorProgress();
+  });
+}, { passive: true });
+
+el<HTMLIFrameElement>("preview").addEventListener("load", () => {
+  // Any re-render replaces the sandbox document and resets its scroll range.
+  if (splitActive()) sendEditorProgress();
+});
+
+// The preview has an opaque origin and may send only measured height or
+// scroll fraction. Verify its window, origin and per-render capability.
 window.addEventListener("message", (event: MessageEvent) => {
   const frame = el<HTMLIFrameElement>("preview");
-  if (!fullPreview || event.source !== frame.contentWindow || event.origin !== "null") return;
+  if (event.source !== frame.contentWindow || event.origin !== "null") return;
   const data: unknown = event.data;
   if (!data || typeof data !== "object" || Array.isArray(data)) return;
   const report = data as Record<string, unknown>;
-  if (report.type !== "garden:preview-height" || report.token !== previewHeightToken) return;
-  if (typeof report.height !== "number" || !Number.isFinite(report.height)
-    || report.height < 0) return;
-  // Bounds avoid an untrusted frame creating an unbounded page or a tiny trap.
-  frame.style.height = `${Math.max(640, Math.min(200000, Math.ceil(report.height)))}px`;
+  if (!previewControlToken || report.token !== previewControlToken) return;
+
+  if (report.type === "garden:preview-height" && fullPreview) {
+    if (typeof report.height !== "number" || !Number.isFinite(report.height)
+      || report.height < 0) return;
+    frame.style.height = String(Math.max(640, Math.min(200000, Math.ceil(report.height)))) + "px";
+  } else if (report.type === "garden:scroll-position" && splitActive() && !fullPreview) {
+    if (typeof report.progress !== "number" || !Number.isFinite(report.progress)
+      || report.progress < 0 || report.progress > 1) return;
+    appliedFromPreview = report.progress;
+    editor.scrollTop = report.progress * Math.max(0, editor.scrollHeight - editor.clientHeight);
+  }
 });
 
 function applyLayout(focus = false) {
@@ -304,14 +348,14 @@ function schedulePreview() {
   const source = editor.value;
   previewTimer = window.setTimeout(() => {
     const frame = el<HTMLIFrameElement>("preview");
-    const token = fullPreview ? crypto.randomUUID() : undefined;
-    // The original split preview never runs a script. Only the full-page
-    // standalone preview runs the repository-owned height reporter, isolated
-    // without allow-same-origin or access to the parent DOM/credentials.
-    frame.setAttribute("sandbox", token ? "allow-scripts" : "");
-    previewHeightToken = token ?? "";
+    const token = crypto.randomUUID();
+    const mode = fullPreview ? "full" : "split";
+    // Trusted height/scroll bridge only, isolated in an opaque-origin frame:
+    // no same-origin access, arbitrary article scripts, forms or credentials.
+    frame.setAttribute("sandbox", "allow-scripts");
+    previewControlToken = token;
     void import("./preview")
-      .then(({ previewDocument }) => previewDocument(source, token))
+      .then(({ previewDocument }) => previewDocument(source, token, mode))
       .then(html => { if (version === previewVersion) frame.srcdoc = html; })
       .catch(() => notice("预览渲染失败；正文仍保留，请保存草稿。", true));
   }, 180);
