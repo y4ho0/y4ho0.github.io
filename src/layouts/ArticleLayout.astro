@@ -75,53 +75,110 @@ const statusLabels = { seedling: { zh: "萌芽", en: "Seedling" }, growing: { zh
     block.append(button);
   });
 
-  // Progressive enhancement: CSS handles hover/focus even without JS.
-  // Delegated events avoid attaching a listener for every terminology instance.
+  // One delegated handler for every inline note: real text in the card is
+  // selectable. Pointer selection pins it until a click outside or Escape.
   const termRoot = document.querySelector<HTMLElement>(".article-shell");
   let opened: HTMLElement | null = null;
+  let pinned = false;
+  let leaveTimer = 0;
+  const clearLeave = () => window.clearTimeout(leaveTimer);
   const closeTerm = () => {
-    if (opened) { opened.classList.remove("is-open"); opened.setAttribute("aria-expanded", "false"); }
+    clearLeave();
+    if (opened) {
+      opened.classList.remove("is-open");
+      opened.querySelector<HTMLElement>(".term-note__trigger")?.setAttribute("aria-expanded", "false");
+    }
     opened = null;
+    pinned = false;
   };
   const revealTerm = (term: HTMLElement) => {
-    if (opened !== term) closeTerm();
-    opened = term;
-    term.classList.add("is-open");
-    term.setAttribute("aria-expanded", "true");
-    const bounds = term.getBoundingClientRect();
-    term.dataset.side = bounds.left > window.innerWidth * .62 ? "right" : "left";
-  };
-  termRoot?.addEventListener("pointerover", event => {
-    if (matchMedia("(hover: hover)").matches) {
-      const term = (event.target as Element).closest<HTMLElement>(".term-note");
-      if (term) revealTerm(term);
+    clearLeave();
+    if (opened !== term) {
+      closeTerm();
+      opened = term;
     }
-  });
-  termRoot?.addEventListener("pointerout", event => {
-    const term = (event.target as Element).closest<HTMLElement>(".term-note");
-    if (term && !term.contains(event.relatedTarget as Node | null) && term !== document.activeElement) closeTerm();
-  });
-  termRoot?.addEventListener("focusin", event => {
+    term.classList.add("is-open");
+    term.querySelector<HTMLElement>(".term-note__trigger")?.setAttribute("aria-expanded", "true");
+    const trigger = term.querySelector<HTMLElement>(".term-note__trigger");
+    const panel = term.querySelector<HTMLElement>(".term-note__panel");
+    if (!trigger || !panel) return;
+    const triggerBox = trigger.getBoundingClientRect();
+    term.dataset.side = triggerBox.left > window.innerWidth * .6 ? "right" : "left";
+    delete term.dataset.placement;
+    // The article uses an anchored card; small/touch screens use a fixed card
+    // controlled by CSS, so desktop-only placement is enough.
+    if (window.matchMedia("(hover: hover) and (min-width: 40.01rem)").matches) {
+      const panelBox = panel.getBoundingClientRect();
+      if (panelBox.bottom > window.innerHeight - 12
+        && triggerBox.top > panelBox.height + 16) term.dataset.placement = "top";
+    }
+  };
+  const scheduleClose = () => {
+    clearLeave();
+    leaveTimer = window.setTimeout(() => {
+      if (opened && !pinned
+        && !opened.contains(document.activeElement)
+        && !opened.matches(":hover")) closeTerm();
+    }, 220);
+  };
+
+  termRoot?.addEventListener("pointerover", event => {
+    if (!window.matchMedia("(hover: hover)").matches) return;
     const term = (event.target as Element).closest<HTMLElement>(".term-note");
     if (term) revealTerm(term);
   });
-  termRoot?.addEventListener("focusout", event => {
+  termRoot?.addEventListener("pointerout", event => {
     const term = (event.target as Element).closest<HTMLElement>(".term-note");
-    if (term && opened === term) closeTerm();
+    if (!term || term.contains(event.relatedTarget as Node | null)) return;
+    if (!pinned) scheduleClose();
+  });
+  termRoot?.addEventListener("focusin", event => {
+    const trigger = (event.target as Element).closest<HTMLElement>(".term-note__trigger");
+    const term = trigger?.closest<HTMLElement>(".term-note");
+    if (term) revealTerm(term);
+  });
+  termRoot?.addEventListener("focusout", event => {
+    const trigger = (event.target as Element).closest<HTMLElement>(".term-note__trigger");
+    if (trigger && !pinned) scheduleClose();
+  });
+  document.addEventListener("pointerdown", event => {
+    const target = event.target as Element;
+    if (target.closest(".term-note__panel")) {
+      // Keep the note visible during drag-selection and Cmd/Ctrl+C.
+      pinned = true;
+      clearLeave();
+    } else if (!target.closest(".term-note")) closeTerm();
   });
   termRoot?.addEventListener("click", event => {
-    const term = (event.target as Element).closest<HTMLElement>(".term-note");
-    if (term) { revealTerm(term); term.focus(); }
-    else if (opened) { opened.blur(); closeTerm(); }
+    const target = event.target as Element;
+    // Crucial: clicking/selecting inside the explanatory card must not
+    // redirect focus to the trigger or collapse the native selection.
+    if (target.closest(".term-note__panel")) return;
+    const trigger = target.closest<HTMLElement>(".term-note__trigger");
+    const term = trigger?.closest<HTMLElement>(".term-note");
+    if (!term || !trigger) return;
+    revealTerm(term);
+    pinned = true;
+    trigger.focus({ preventScroll: true });
   });
   termRoot?.addEventListener("keydown", event => {
-    const term = (event.target as Element).closest<HTMLElement>(".term-note");
-    if (event.key === "Escape") { if (opened) { event.preventDefault(); opened.blur(); closeTerm(); } }
-    else if (term && (event.key === "Enter" || event.key === " ")) {
+    const trigger = (event.target as Element).closest<HTMLElement>(".term-note__trigger");
+    const term = trigger?.closest<HTMLElement>(".term-note");
+    if (term && (event.key === "Enter" || event.key === " ")) {
       event.preventDefault();
       revealTerm(term);
+      pinned = true;
     }
   });
+  document.addEventListener("keydown", event => {
+    if (event.key !== "Escape" || !opened) return;
+    event.preventDefault();
+    const trigger = opened.querySelector<HTMLElement>(".term-note__trigger");
+    closeTerm();
+    if (trigger === document.activeElement) trigger?.blur();
+  });
+  window.addEventListener("pageswap", closeTerm);
+
   const article = document.querySelector<HTMLElement>(".article-shell");
   const progress = document.querySelector<HTMLElement>(".reading-progress span");
   const headings = Array.from(document.querySelectorAll<HTMLElement>(".prose :is(h2, h3, h4)[id]"));

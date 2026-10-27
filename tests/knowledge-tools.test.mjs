@@ -16,8 +16,13 @@ const render = (source) => String(processor.processSync(source));
 test("an inline term becomes a keyboard-focusable, text-only explanation", () => {
   const html = render(':term[RPC]{note="远程过程调用"}');
   assert.match(html, /class="term-note"/u);
+  assert.match(html, /class="term-note__trigger"/u);
   assert.match(html, /tabindex="0"/u);
-  assert.match(html, /data-note="远程过程调用"/u);
+  assert.match(html, /aria-expanded="false"/u);
+  assert.match(html, /class="term-note__panel"/u);
+  assert.match(html, /role="note"/u);
+  assert.match(html, />远程过程调用<\/span>/u);
+  assert.doesNotMatch(html, /data-note=|::after/u);
   assert.match(html, /RPC/u);
 });
 
