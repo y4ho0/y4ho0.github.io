@@ -170,6 +170,8 @@
 
 .daily-quote blockquote p {
   position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   max-width: none;
   color: var(--color-text);
   font-family: var(--font-display);
@@ -203,13 +205,18 @@
   font-size: clamp(1.55rem, 2.25vw, 1.95rem);
 }
 
+.daily-quote__sizer,
+.daily-quote__typing {
+  /* Both layers determine the height when animated words wrap differently. */
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
 .daily-quote__sizer {
   display: block;
 }
 
 .daily-quote__typing {
-  position: absolute;
-  inset: 0;
   display: none;
 }
 
@@ -230,7 +237,10 @@
 }
 
 .daily-quote__word {
-  white-space: nowrap;
+  display: inline-block;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .daily-quote__character {
