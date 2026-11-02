@@ -265,11 +265,14 @@ test("the real Pagefind index finds Chinese phrases when it first loads with the
 
 async function observeLanguageMotion(page: Page, inspectMidpoint = false) {
   await page.addInitScript(inspectMidpoint => {
-    const probes: { ready: boolean; finished: boolean; skipped: boolean; duration?: string; opacity?: number; headerName?: string }[] = [];
+    const probes: { ready: boolean; finished: boolean; skipped: boolean; duration?: string; opacity?: number; headerName?: string;
+      arrow?: { oldLeft: number; newLeft: number; midpointLeft: number; opacity: number; duration: string; labelDuration: string; interactive: boolean } }[] = [];
     (window as any).__languageMotion = probes;
     if (typeof document.startViewTransition !== "function") return;
     const start = document.startViewTransition.bind(document);
     document.startViewTransition = options => {
+      const arrow = document.querySelector<HTMLElement>(".hero__link [data-ui-language-motion]");
+      const oldArrowLeft = arrow?.getBoundingClientRect().left;
       const transition = start(options);
       const probe = { ready: false, finished: false, skipped: false } as (typeof probes)[number];
       probes.push(probe);
@@ -287,6 +290,23 @@ async function observeLanguageMotion(page: Page, inspectMidpoint = false) {
         for (const animation of animations) { animation.pause(); animation.currentTime = 130; }
         await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
         probe.opacity = Number(getComputedStyle(document.documentElement, snapshot).opacity);
+        if (arrow && oldArrowLeft !== undefined && animations.some(animation =>
+          (animation.effect as KeyframeEffect).pseudoElement === `::view-transition-group(${arrow.style.viewTransitionName})`)) {
+          const name = arrow.style.viewTransitionName;
+          const label = document.querySelector<HTMLElement>(".hero__link .ui-text")!;
+          const bounds = arrow.getBoundingClientRect();
+          const link = arrow.closest("a")!;
+          const linkBounds = link.getBoundingClientRect();
+          const hit = document.elementFromPoint(linkBounds.left + linkBounds.width / 2, linkBounds.top + linkBounds.height / 2);
+          const image = getComputedStyle(document.documentElement, `::view-transition-new(${name})`);
+          probe.arrow = {
+            oldLeft: oldArrowLeft, newLeft: bounds.left,
+            midpointLeft: new DOMMatrix(getComputedStyle(document.documentElement, `::view-transition-group(${name})`).transform).e,
+            opacity: Number(image.opacity), duration: image.animationDuration,
+            labelDuration: getComputedStyle(document.documentElement, `::view-transition-new(${label.style.viewTransitionName})`).animationDuration,
+            interactive: hit === link || link.contains(hit),
+          };
+        }
         for (const animation of animations) animation.play();
       }, () => { probe.skipped = true; });
       void transition.finished.then(() => { probe.finished = true; }, () => { probe.finished = true; });
@@ -321,6 +341,53 @@ test("explicit language changes use a native eased fade and clean up without a r
   await expectLanguage(page, "en");
   expect(await page.evaluate(() => (window as any).__languageMotion)).toEqual([]);
   await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+});
+
+test("the garden link arrow moves and fades with its translated label while the link stays clickable", async ({ page }) => {
+  await observeLanguageMotion(page, true);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await page.evaluate(() => document.fonts.ready);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await switchLanguage(page, "en");
+  await expect.poll(() => page.evaluate(() => (window as any).__languageMotion[0]?.arrow?.opacity)).toBeGreaterThan(0);
+  const motion = await page.evaluate(() => (window as any).__languageMotion[0].arrow);
+  expect(motion.opacity).toBeLessThan(1);
+  expect(motion.duration).toBe(motion.labelDuration);
+  expect(motion.duration.split(",").every((value: string) => value.trim() === "0.26s")).toBe(true);
+  expect(Math.abs(motion.newLeft - motion.oldLeft)).toBeGreaterThan(5);
+  expect(motion.midpointLeft).toBeGreaterThan(Math.min(motion.oldLeft, motion.newLeft) + 1);
+  expect(motion.midpointLeft).toBeLessThan(Math.max(motion.oldLeft, motion.newLeft) - 1);
+  expect(motion.interactive).toBe(true);
+  await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+  await page.evaluate(() => {
+    document.querySelector<HTMLButtonElement>('.site-nav [data-language-value="zh-CN"]')!.click();
+    document.querySelector<HTMLButtonElement>('.site-nav [data-language-value="en"]')!.click();
+  });
+  await expectLanguage(page, "en");
+  await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+  expect(await page.locator(".hero__link [data-ui-language-motion]").evaluate((element: HTMLElement) => element.style.viewTransitionName)).toBe("");
+  await page.locator(".hero__link").click();
+  await expect(page).toHaveURL(/\/garden\/$/u);
+});
+
+test("the garden arrow respects reduced motion and shares the older-browser reveal", async ({ page }) => {
+  await observeLanguageMotion(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await switchLanguage(page, "en");
+  expect(await page.evaluate(() => (window as any).__languageMotion)).toEqual([]);
+  await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+  await page.addInitScript(() => Object.defineProperty(document, "startViewTransition", { configurable: true, value: undefined }));
+  await page.reload();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const reveal = await page.evaluate(() => {
+    document.querySelector<HTMLButtonElement>('.site-nav [data-language-value="zh-CN"]')!.click();
+    return [...document.querySelectorAll(".hero__link > span")].map(element => getComputedStyle(element).animationDuration);
+  });
+  expect(reveal).toEqual(["0.2s", "0.2s"]);
+  await expect(page.locator("html")).not.toHaveAttribute("data-ui-language-transition");
+  await expect(page.locator(".hero__link")).toHaveAttribute("href", "/garden/");
 });
 
 test("rapid language clicks reach the final choice while preserving search, selection, scroll and an open mobile menu", async ({ page }) => {

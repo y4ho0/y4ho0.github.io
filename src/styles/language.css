@@ -10,7 +10,7 @@
 .mobile-menu__language { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-top:1rem; }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Capture only individually named text. Controls, dialogs and the page
+  /* Capture individually named text and decoration. Controls and the page
      remain live, while ordinary navigation keeps its stationary header. */
   :root[data-ui-language-transition="native"] { view-transition-name:none; }
   :root[data-ui-language-transition="native"] .site-header { view-transition-name:none; }
@@ -32,7 +32,7 @@
   :root[data-ui-language-transition="native"]::view-transition-old(*),
   :root[data-ui-language-transition="native"]::view-transition-new(*) { width:auto; height:auto; }
 
-  :root[data-ui-language-transition="fallback"] :is(.ui-text,[data-ui-message],[data-ui-date]) {
+  :root[data-ui-language-transition="fallback"] :is(.ui-text,[data-ui-message],[data-ui-date],[data-ui-language-motion]) {
     animation:ui-language-reveal 200ms cubic-bezier(.4,0,.2,1) both;
   }
 }

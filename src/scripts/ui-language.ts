@@ -40,9 +40,9 @@ function changeLanguage(language: UiLanguage, animate = false) {
   };
   if (typeof document.startViewTransition === "function") {
     root.dataset.uiLanguageTransition = "native";
-    // Snapshot translated text rather than its interactive ancestors. Capturing
-    // the root or a dialog makes their live controls unavailable to hit testing.
-    namedText = [...document.querySelectorAll<HTMLElement>(".ui-text,[data-ui-message],[data-ui-date]")]
+    // Snapshot text and its accompanying decoration, keeping their interactive
+    // ancestors available to hit testing throughout the language change.
+    namedText = [...document.querySelectorAll<HTMLElement>(".ui-text,[data-ui-message],[data-ui-date],[data-ui-language-motion]")]
       .filter(element => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden")
       .map(element => ({ element, value: element.style.getPropertyValue("view-transition-name"), priority: element.style.getPropertyPriority("view-transition-name") }));
     namedText.forEach(({ element }, index) => { element.style.setProperty("view-transition-name", `language-text-${index}`); });
