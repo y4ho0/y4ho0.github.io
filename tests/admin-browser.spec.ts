@@ -404,6 +404,77 @@ test("local drafts recover after reload while token disappears from all browser 
   expect(await storedDocuments(page)).not.toContain(TOKEN);
 });
 
+test("a missing admin entry offers a fresh tab while restored text remains copyable", async ({ page }) => {
+  await page.route("**/_astro/index.astro*.js", route => route.fulfill({ status: 404, body: "" }));
+  await page.goto("/admin/");
+  const editor = page.locator("#markdown");
+  await editor.evaluate((node: HTMLTextAreaElement) => { node.value = "浏览器保留的正文"; });
+  await expect(editor).toHaveAttribute("readonly", "");
+  await expect(page.locator("#save-draft")).toBeDisabled();
+  await expect(page.locator("#login-form")).toBeHidden();
+  const recovery = page.locator("#preview-status a");
+  await expect(recovery).toBeVisible();
+  const opened = page.waitForEvent("popup");
+  await recovery.click();
+  const fresh = await opened;
+  await expect(fresh.locator("#entry-path")).toContainText("新文件 →");
+  await expect(fresh.frameLocator("#preview").locator(".prose")).toBeAttached();
+  await expect(editor).toHaveValue("浏览器保留的正文");
+});
+
+test("a missing preview bundle leaves local saving available and offers recovery in the pane", async ({ page }) => {
+  await page.route("**/_astro/preview.*.js", route => route.abort());
+  await openAdmin(page);
+  await page.locator("#markdown").fill("离线修改");
+  await expect(page.locator("#preview-status")).toContainText("预览加载失败");
+  await expect(page.locator("#preview-status a")).toBeVisible();
+  await page.locator("#save-draft").click();
+  await expect.poll(() => storedDocuments(page)).toContain("离线修改");
+});
+
+test("backgrounding flushes the pending draft without ending the live GitHub session", async ({ page }) => {
+  await mockGitHub(page); await openAdmin(page); await login(page);
+  await page.clock.install();
+  await page.clock.pauseAt(new Date());
+  await page.locator("#markdown").fill("切换前的最后一笔");
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect.poll(() => storedDocuments(page)).toContain("切换前的最后一笔");
+  await expect(page.locator("#publish")).toBeEnabled();
+});
+
+test("restored form text is previewed and saved even without an input event", async ({ page }) => {
+  await openAdmin(page);
+  await page.evaluate(() => {
+    (document.querySelector("#markdown") as HTMLTextAreaElement).value = "## 浏览器恢复的正文";
+    window.dispatchEvent(new PageTransitionEvent("pageshow"));
+  });
+  await expect(page.frameLocator("#preview").getByRole("heading")).toHaveText("浏览器恢复的正文");
+  await expect.poll(() => storedDocuments(page)).toContain("浏览器恢复的正文");
+  await expect(page.locator('[name="draft"]')).toBeChecked();
+});
+
+test("history restoration rebuilds a lost preview and clears stale repository controls", async ({ page }) => {
+  await mockGitHub(page, { "src/content/essays/existing.md": article() });
+  await openAdmin(page); await login(page); await openArticle(page);
+  const heading = page.frameLocator("#preview").getByRole("heading");
+  await expect(heading).toHaveText("Remote original");
+  await page.evaluate(() => {
+    window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: true }));
+    (document.querySelector("#preview") as HTMLIFrameElement).srcdoc = "";
+    window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+  });
+  await expect(heading).toHaveText("Remote original");
+  await expect(page.locator("#repo-count")).toHaveText("仓库尚未加载");
+  await expect(page.locator("#entry-list button")).toHaveCount(0);
+  await expect(page.locator("#publish")).toBeDisabled();
+  await expect(page.locator("#notice")).toContainText("重新连接 GitHub");
+  await login(page);
+  await expect(page.locator("#markdown")).toHaveValue(/Remote original/u);
+});
+
 test("restoring the active draft keeps edits newer than the saved list snapshot", async ({ page }) => {
   await mockGitHub(page); await openAdmin(page);
   await page.locator('[name="title"]').fill("Current draft");

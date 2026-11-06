@@ -38,7 +38,7 @@ const toolGroups = [
     <main class="admin-main">
       <section class="panel auth-panel" aria-label="GitHub 认证">
         <div><strong id="identity">本地写作 · 尚未连接 GitHub</strong><p>令牌只保存在此页面内存。刷新或退出即清除。公开仓库里的草稿和图片仍然公开。</p></div>
-        <form id="login-form">
+        <form id="login-form" hidden>
           <label for="token">Fine-grained PAT</label>
           <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="仅目标仓库 · Contents: Read and write" required />
           <button type="submit">连接 GitHub</button>
@@ -46,7 +46,7 @@ const toolGroups = [
         <button id="logout" hidden>退出并清除凭据</button>
         <details class="security-help"><summary>认证配置与安全说明</summary><p>在 GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens 新建短期令牌。Resource owner 选择 y4ho0，Only select repositories 仅选择 y4ho0.github.io，Repository permissions 仅开启 Contents: Read and write（Metadata 自动只读）。账号也必须有仓库写权限。不要将令牌写入文章、URL 或代码。</p><p>静态网页无法保护令牌免受浏览器扩展、设备上的恶意软件或本站其他页面脚本的影响。仅在可信设备使用，用完退出并按需在 GitHub 撤销。IndexedDB 草稿未加密、只在本浏览器可恢复；它不等于备份。</p></details>
       </section>
-      <p id="notice" role="status" aria-live="polite">可以离线写作并保存本地草稿。连接 GitHub 后加载仓库文章及媒体。</p>
+      <p id="notice" role="status" aria-live="polite">正在启动文章管理。若长时间没有响应，请先复制当前正文，再<a href="/admin/?recover" target="_blank" rel="noopener">在新标签页重新打开后台</a>。</p>
       <div id="result" class="panel" hidden><span id="result-text"></span> <a id="commit-link" target="_blank" rel="noopener noreferrer">查看提交 ↗</a> <button id="check-deploy">检查部署</button> <span id="deploy-status"></span></div>
       <div class="workspace">
         <aside class="library panel">
@@ -87,14 +87,17 @@ const toolGroups = [
             {toolGroups.slice(1).map(group => <div class="format-group">{group.map(([id, label]) => <button type="button" data-command={id}>{label}</button>)}</div>)}
             <div class="format-group" aria-label="知识组件"><button id="insert-term-note" type="button">术语便签</button><button id="insert-prototype" type="button">原型卡片</button></div>
           </div>
-          <div id="editor-tabs" role="tablist" aria-label="编辑或预览"><button id="tab-edit" role="tab" aria-controls="edit-pane" aria-selected="true">编辑</button><button id="tab-preview" role="tab" aria-controls="preview-pane" aria-selected="false">预览</button></div>
+          <div id="editor-tabs" hidden role="tablist" aria-label="编辑或预览"><button id="tab-edit" role="tab" aria-controls="edit-pane" aria-selected="true">编辑</button><button id="tab-preview" role="tab" aria-controls="preview-pane" aria-selected="false">预览</button></div>
           <div id="writing-area" class="writing-area" data-layout="split" data-tab="edit">
-            <div id="edit-pane"><label class="sr-only" for="markdown">Markdown 正文</label><textarea id="markdown" spellcheck="false" placeholder="从 ## 标题开始写作…"></textarea></div>
+            <div id="edit-pane"><label class="sr-only" for="markdown">Markdown 正文</label><textarea id="markdown" readonly spellcheck="false" placeholder="从 ## 标题开始写作…"></textarea></div>
             <div id="splitter" role="separator" tabindex="0" aria-label="调整编辑器宽度" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="50"></div>
-            <div id="preview-pane"><iframe id="preview" title="文章实时预览" sandbox="" referrerpolicy="no-referrer"></iframe></div>
+            <div id="preview-pane">
+              <p id="preview-status" role="status"><span id="preview-message">正在加载编辑器与预览。如果一直停在这里，请先复制当前正文。</span> <a href="/admin/?recover" target="_blank" rel="noopener">在新标签页重新打开后台</a></p>
+              <iframe id="preview" hidden title="文章实时预览" sandbox="" referrerpolicy="no-referrer"></iframe>
+            </div>
           </div>
           <p class="muted preview-help">文章页及列表的标题取自上方“标题”字段，正文通常从二级标题开始。工具作用于光标或选区，悬停可查看快捷键。支持 GFM、代码高亮、KaTeX 与语义块；预览禁用原始 HTML，高亮与最终 Shiki 有细微差异。</p>
-          <div class="actions"><button id="save-draft">保存本地草稿</button><button id="export">导出 Markdown</button><button id="publish" class="primary" disabled>提交到 GitHub</button><button id="delete-entry" class="danger" disabled>删除仓库文章</button></div>
+          <div class="actions"><button id="save-draft" disabled>保存本地草稿</button><button id="export" disabled>导出 Markdown</button><button id="publish" class="primary" disabled>提交到 GitHub</button><button id="delete-entry" class="danger" disabled>删除仓库文章</button></div>
           <details id="media-panel"><summary>媒体管理 · 拖拽 / 粘贴 / 选择图片</summary><p class="muted">确认上传后会立即提交到公开仓库，与文章发布独立。支持 PNG / JPEG / GIF / WebP，最多 5 MiB。每次处理一张图片；多张仅取第一张。图片放在 public/images/文章ID/。</p>
             <div id="media-dropzone" class="media-dropzone" tabindex="0" role="region" aria-label="图片拖拽与粘贴区域">
               <strong>拖拽图片到这里，或在编辑区粘贴图片</strong><span>⌘ / Ctrl + V · 也可以选择文件</span>
