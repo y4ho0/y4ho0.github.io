@@ -379,11 +379,16 @@ function schedulePreview() {
         previewControlToken = token;
         lastRenderedSource = source;
         frame.srcdoc = html;
+        frame.hidden = false;
+        el("preview-status").hidden = true;
       })
       .catch((error: unknown) => {
         if (version !== previewVersion) return;
         console.error("[preview-render-error]", error instanceof Error ? error.message : String(error));
-        notice("预览渲染失败；正文仍保留，请保存草稿。", true);
+        lastRenderedSource = undefined;
+        frame.hidden = true;
+        el("preview-message").textContent = "预览加载失败。请先保存草稿或导出 Markdown，再重新打开后台。";
+        el("preview-status").hidden = false;
       });
   }, 120);
 }
@@ -417,12 +422,16 @@ el("login-form").addEventListener("submit", event => {
   const token = el<HTMLInputElement>("token").value.trim(); el<HTMLInputElement>("token").value = "";
   void run(async () => { const user = await client.login(token); el("identity").textContent = `GitHub · ${user.login} · y4ho0/y4ho0.github.io`; await loadRepository(); notice("已验证账号及目标仓库 Contents 写权限。可以提交文章与图片。"); });
 });
-el("logout").onclick = () => {
+function disconnect() {
   sessionVersion++; client.logout(); el<HTMLInputElement>("token").value = ""; entries = []; media = [];
   renderEntries(); el("repo-count").textContent = "仓库尚未加载"; el("identity").textContent = "本地写作 · 尚未连接 GitHub";
   el<HTMLSelectElement>("media-select").replaceChildren(new Option("选择图片", ""));
-  clearMedia(); el("result").hidden = true; lastCommit = "";
-  updateControls(); notice("已清除内存凭据并中止未完成的请求。本地文章草稿仍保留，可另行清空。已被 GitHub 接收的提交无法通过退出撤回。");
+  el("result").hidden = true; lastCommit = "";
+  courseOptions(); updateControls();
+}
+el("logout").onclick = () => {
+  disconnect(); clearMedia();
+  notice("已清除内存凭据并中止未完成的请求。本地文章草稿仍保留，可另行清空。已被 GitHub 接收的提交无法通过退出撤回。");
 };
 el("publish").onclick = () => void run(async () => {
   await persist();
@@ -521,9 +530,36 @@ el("upload").onclick = () => void run(async () => {
   await showCommit(result, "图片"); insertImage(path); await persist(); clearMedia(); await loadRepository();
 });
 window.addEventListener("beforeunload", event => { if (dirty) event.preventDefault(); });
-window.addEventListener("pagehide", () => { client.logout(); el<HTMLInputElement>("token").value = ""; });
-window.addEventListener("pageshow", event => { if (event.persisted) { sessionVersion++; updateControls(); el("identity").textContent = "本地写作 · 尚未连接 GitHub"; } });
-renderActive(); applyLayout();
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden" && dirty && !busy) {
+    void persist().catch(error => notice(message(error), true));
+  }
+});
+window.addEventListener("pagehide", disconnect);
+window.addEventListener("pageshow", event => {
+  // The browser can restore form values without firing an input event.
+  // Rebuild the sandbox on a history restore even if the Markdown is identical.
+  if (event.persisted) {
+    lastRenderedSource = undefined;
+    notice("页面已恢复。可继续本地写作，提交前请重新连接 GitHub。");
+  }
+  // History form restoration may finish just after pageshow.
+  window.setTimeout(() => {
+    if (editor.value !== active.body && editor.value) recoverFormText();
+    schedulePreview();
+  }, 0);
+});
+function recoverFormText() {
+  if (!active.path) {
+    input("draft").checked = true;
+    if (!field("updatedAt").value) field("updatedAt").value = new Date().toISOString().slice(0, 10);
+  }
+  changed();
+  notice("已找回浏览器保留的正文，正在保存为本地草稿。请核对标题及文章设置。");
+}
+if (editor.value) recoverFormText();
+else renderActive();
+applyLayout();
 bindEditorTools({
   editor,
   prepare: () => {
@@ -546,4 +582,10 @@ bindKnowledgeTools({
   },
   afterEdit: rememberPosition,
 });
+editor.readOnly = false;
+el<HTMLButtonElement>("save-draft").disabled = false;
+el<HTMLButtonElement>("export").disabled = false;
+if (!dirty) notice(("wasDiscarded" in document && document.wasDiscarded)
+  ? "浏览器已重新加载此标签页。请从本地草稿恢复文章，提交前重新连接 GitHub。"
+  : "可以离线写作并保存本地草稿。连接 GitHub 后加载仓库文章及媒体。");
 void renderDrafts().catch(error => notice(message(error), true));

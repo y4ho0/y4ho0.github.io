@@ -102,6 +102,7 @@ details[open] > label { margin-top:.8rem; }
 .writing-area { --split:50%; display:grid; grid-template-columns:minmax(0,var(--split)) .6rem minmax(0,1fr); height:clamp(46rem, 82dvh, 76rem); border:1px solid var(--color-border); border-radius:.4rem; overflow:hidden; }
 #edit-pane,#preview-pane { min-width:0; height:100%; overflow:hidden; }
 #markdown { width:100%; height:100%; resize:none; margin:0; border:0; border-radius:0; padding:1rem; font:.9rem/1.75 ui-monospace,SFMono-Regular,Menlo,monospace; tab-size:2; overflow:auto; }
+#preview-status { margin:1rem; }
 #preview { width:100%; height:100%; border:0; background:var(--color-surface-raised); }
 #splitter { cursor:col-resize; background:var(--color-border); touch-action:none; }
 #splitter:focus-visible { outline-offset:-2px; }
