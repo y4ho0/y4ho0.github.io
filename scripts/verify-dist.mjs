@@ -56,6 +56,12 @@ function internalTarget(href) {
 for (const file of htmlFiles) {
   const html = await readFile(file, "utf8");
   const relativeFile = path.relative(dist, file);
+  const documentEnd = html.lastIndexOf("</html>");
+  if (documentEnd < 0) {
+    errors.push(`${relativeFile} has no closing html element`);
+  } else if (html.slice(documentEnd + "</html>".length).trim()) {
+    errors.push(`${relativeFile} has content after the closing html element`);
+  }
   const fontPreloads = (html.match(/<link\b[^>]*>/gu) ?? []).filter(tag => /\brel="preload"/u.test(tag) && /\bas="font"/u.test(tag));
   if (!fontPreloads.some(tag => tag.includes(`href="${criticalFont.url}"`) && /\bcrossorigin(?:=|\s|>)/u.test(tag))) {
     errors.push(`${relativeFile} is missing its shared critical font preload`);

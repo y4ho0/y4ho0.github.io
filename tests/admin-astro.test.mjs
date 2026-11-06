@@ -135,6 +135,12 @@ test("CMS-serialized heterogeneous entries build real Astro routes, math, direct
     await assert.rejects(access(path.join(dist, draftRoute.slice(1), "index.html")), { code: "ENOENT" });
     const archive = await readFile(path.join(dist, "archive", "index.html"), "utf8");
     assert.equal(archive.includes("CMS fixture unpublished-draft"), false);
+    assert.ok(archive.includes("data-archive-grid"), "the fixture exercises a populated archive");
+    for (const route of ["archive/index.html", "demos/hdfs-write/index.html"]) {
+      const html = await readFile(path.join(dist, route), "utf8");
+      assert.match(html, /<\/body>\s*<\/html>\s*$/u,
+        `${route}: page scripts must stay inside the generated document`);
+    }
 
     const rss = await readFile(path.join(dist, "rss.xml"), "utf8");
     const rssLinks = [...rss.matchAll(/<item>[\s\S]*?<link>([^<]+)<\/link>/gu)].map((match) => match[1]);

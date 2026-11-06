@@ -1,5 +1,53 @@
 import { test, expect, type Page } from "@playwright/test";
 
+test("archive scripts stay inside the document and combine all five filters", async ({ page }) => {
+  await page.route("**/archive/", async route => {
+    const response = await route.fetch();
+    const html = await response.text();
+    expect(html).toMatch(/<\/body>\s*<\/html>\s*$/u);
+    // Supply unpublished test cards before the real deferred page script runs.
+    // Repository articles and the compiled filter implementation stay intact.
+    const fields = { type: ["notes", "labs", "essays"], status: ["growing", "evergreen", "seedling"],
+      tag: ["shared", "other"], course: ["course-a", "course-b"], year: ["2025", "2026"] };
+    const form = Object.entries(fields).map(([name, options]) => `<label>${name}<select name="${name}"><option value="">All</option>${options.map(value => `<option>${value}</option>`).join("")}</select></label>`).join("");
+    const fixture = `<section id="archive-filter-fixture"><form class="archive-filters">${form}</form><div data-archive-grid>
+      <article data-type="notes" data-status="growing" data-tags='["shared"]' data-course="course-a" data-year="2026">Note</article>
+      <article data-type="labs" data-status="evergreen" data-tags='["shared"]' data-course="course-b" data-year="2025">Lab</article>
+      <article data-type="essays" data-status="seedling" data-tags='["other"]' data-course="" data-year="2026">Essay</article>
+      </div><p data-filter-empty hidden>No matches</p></section>`;
+    const body = html.replace(/(<main\b[^>]*id="main-content"[^>]*>)([\s\S]*?)(<\/main>)/u,
+      (_, open, content, close) => `${open}${fixture}${(content.match(/<script\b[^>]*>[\s\S]*?<\/script>/gu) ?? []).join("")}${close}`);
+    expect(body).toContain('id="archive-filter-fixture"');
+    await route.fulfill({ response, body });
+  });
+  await page.goto("/archive/");
+  const fixture = page.locator("#archive-filter-fixture");
+  const visible = fixture.locator("[data-archive-grid] > :visible");
+  const filter = (name: string, value: string) => fixture.locator(`[name="${name}"]`).selectOption(value);
+  await expect(visible).toHaveCount(3);
+  await filter("type", "notes");
+  await expect(visible).toHaveText(["Note"]);
+  await filter("status", "evergreen");
+  await expect(visible).toHaveCount(0);
+  await expect(fixture.locator("[data-filter-empty]")).toBeVisible();
+  await filter("type", "");
+  await expect(visible).toHaveText(["Lab"]);
+  await filter("status", "");
+  await filter("tag", "other");
+  await expect(visible).toHaveText(["Essay"]);
+  await filter("course", "course-a");
+  await expect(visible).toHaveCount(0);
+  await filter("tag", "");
+  await expect(visible).toHaveText(["Note"]);
+  await filter("year", "2025");
+  await expect(visible).toHaveCount(0);
+  await filter("course", "");
+  await expect(visible).toHaveText(["Lab"]);
+  await filter("year", "");
+  await expect(visible).toHaveCount(3);
+  await expect(fixture.locator("[data-filter-empty]")).toBeHidden();
+});
+
 type Preference = "system" | "light" | "dark";
 type Language = "zh-CN" | "en";
 

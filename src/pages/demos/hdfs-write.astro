@@ -31,7 +31,6 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     <p class="foot">示意流程按经典 HDFS 读写设计组织。真实写入涉及数据包、确认链、心跳、校验、异常恢复以及具体副本放置策略。节点数是概念示例，非当前伪分布式实验的实测结果。</p>
     <p><a href="/courses/">返回课程目录</a></p>
   </main>
-</BaseLayout>
 <style>
   .demo{padding-block:3rem 5rem;max-width:66rem}
   h1{font:400 clamp(1.8rem,4vw,2.6rem) var(--font-body);line-height:1.3;margin:0 0 1rem}
@@ -79,3 +78,4 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
   root?.querySelector("#restart")?.addEventListener("click", () => {index = 0;render()});
   render();
 </script>
+</BaseLayout>
