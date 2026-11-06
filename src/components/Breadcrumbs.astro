@@ -1,6 +1,10 @@
 ---
+import UiText from "./UiText.astro";
+import { uiAttrs } from "../lib/ui-language";
+
 interface Item {
   label: string;
+  labelEn?: string;
   href?: string;
 }
 
@@ -21,11 +25,11 @@ const breadcrumbData = {
 };
 ---
 
-<nav class="breadcrumbs" aria-label="Breadcrumb">
+<nav class="breadcrumbs" {...uiAttrs({ "aria-label": { zh: "面包屑导航", en: "Breadcrumb" } })}>
   <ol>
     {items.map((item, index) => (
       <li>
-        {item.href && index < items.length - 1 ? <a href={item.href}>{item.label}</a> : <span aria-current="page">{item.label}</span>}
+        {item.href && index < items.length - 1 ? <a href={item.href}><UiText zh={item.label} en={item.labelEn ?? item.label} /></a> : <span aria-current="page"><UiText zh={item.label} en={item.labelEn ?? item.label} /></span>}
       </li>
     ))}
   </ol>

@@ -13,6 +13,6 @@ const { Content, headings } = await render(entry);
 const related = await resolveRelated(entry);
 ---
 
-<ArticleLayout entry={entry} breadcrumbs={[{ label: "Home", href: "/" }, { label: "Essays", href: "/essays/" }, { label: entry.data.title }]} related={related} headings={headings}>
+<ArticleLayout entry={entry} breadcrumbs={[{ label: "首页", labelEn: "Home", href: "/" }, { label: "随笔", labelEn: "Essays", href: "/essays/" }, { label: entry.data.title }]} related={related} headings={headings}>
   <Content />
 </ArticleLayout>

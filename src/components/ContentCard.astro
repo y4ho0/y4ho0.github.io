@@ -1,4 +1,6 @@
 ---
+import UiText from "./UiText.astro";
+import { uiAttrs } from "../lib/ui-language";
 import type { AnyContentEntry } from "../lib/content-routing";
 import { collectionLabel, entryRoute } from "../lib/content-routing";
 
@@ -7,17 +9,19 @@ interface Props {
 }
 
 const { entry } = Astro.props;
+const collectionZh = { courses: "课程", notes: "笔记", labs: "实验", projects: "项目", essays: "随笔" };
+const statusLabels = { seedling: { zh: "萌芽", en: "Seedling" }, growing: { zh: "成长", en: "Growing" }, evergreen: { zh: "常青", en: "Evergreen" } };
 ---
 
 <article class="content-card" data-content-card data-content-type={entry.collection}>
   <div class="content-card__meta">
-    <span>{collectionLabel(entry.collection)}</span>
-    <span>{entry.data.status}</span>
+    <span><UiText zh={collectionZh[entry.collection]} en={collectionLabel(entry.collection)} /></span>
+    <span><UiText {...statusLabels[entry.data.status]} /></span>
   </div>
   <h2><a href={entryRoute(entry)}>{entry.data.title}</a></h2>
   <p>{entry.data.description}</p>
   {entry.data.tags.length > 0 && (
-    <ul class="tag-list" aria-label="Tags">
+    <ul class="tag-list" {...uiAttrs({ "aria-label": { zh: "标签", en: "Tags" } })}>
       {entry.data.tags.map((tag) => <li>{tag}</li>)}
     </ul>
   )}

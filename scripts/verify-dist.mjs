@@ -1,8 +1,15 @@
 import { access, readFile, readdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 
 const dist = path.resolve("dist");
 const errors = [];
+const criticalFont = JSON.parse(await readFile("src/data/wenkai-ui-font.json", "utf8"));
+const criticalFontBytes = await readFile(path.join(dist, criticalFont.url));
+const fontHash = createHash("sha256").update(criticalFontBytes).digest("hex").slice(0, 12);
+if (criticalFontBytes.length !== criticalFont.bytes || !criticalFont.url.endsWith(`ui-${fontHash}.woff2`)) {
+  errors.push("critical font does not match its content-hashed manifest");
+}
 
 async function walk(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -17,6 +24,7 @@ for (const required of [
   "index.html",
   "404.html",
   "search/index.html",
+  "admin/index.html",
   "rss.xml",
   "sitemap.xml",
   "robots.txt",
@@ -54,6 +62,10 @@ for (const file of htmlFiles) {
   } else if (html.slice(documentEnd + "</html>".length).trim()) {
     errors.push(`${relativeFile} has content after the closing html element`);
   }
+  const fontPreloads = (html.match(/<link\b[^>]*>/gu) ?? []).filter(tag => /\brel="preload"/u.test(tag) && /\bas="font"/u.test(tag));
+  if (!fontPreloads.some(tag => tag.includes(`href="${criticalFont.url}"`) && /\bcrossorigin(?:=|\s|>)/u.test(tag))) {
+    errors.push(`${relativeFile} is missing its shared critical font preload`);
+  }
   const h1Count = (html.match(/<h1(?:\s|>)/gu) ?? []).length;
   if (h1Count !== 1) errors.push(`${relativeFile} has ${h1Count} h1 elements`);
   for (const imageTag of html.match(/<img\b[^>]*>/gu) ?? []) {
@@ -67,6 +79,11 @@ for (const file of htmlFiles) {
   if (inlineScriptBytes > 30_000) errors.push(`${relativeFile} has ${inlineScriptBytes} bytes of inline module JavaScript`);
   if (relativeFile !== "index.html" && html.includes("home-canvas")) errors.push(`${relativeFile} loads the home canvas`);
   if (relativeFile === "404.html" && !html.includes('name="robots" content="noindex, nofollow"')) errors.push("404.html is indexable");
+  if (relativeFile === "admin/index.html") {
+    if (!html.includes('name="robots" content="noindex, nofollow"')) errors.push("admin is indexable");
+    if (!html.includes('http-equiv="Content-Security-Policy"')) errors.push("admin has no content security policy");
+    if (html.includes("data-pagefind-body")) errors.push("admin is included in the article search body");
+  }
   const canonicalMatches = [...html.matchAll(/<link\s+rel="canonical"\s+href="([^"]+)"/gu)];
   if (canonicalMatches.length !== 1) {
     errors.push(`${relativeFile} has ${canonicalMatches.length} canonical links`);
@@ -92,6 +109,7 @@ for (const file of htmlFiles) {
 const sitemap = await readFile(path.join(dist, "sitemap.xml"), "utf8");
 if (!sitemap.includes("<urlset") || sitemap.includes("sitemapindex")) errors.push("sitemap.xml is not a single URL set");
 if (sitemap.includes("/404")) errors.push("sitemap.xml includes the 404 page");
+if (sitemap.includes("/admin/")) errors.push("sitemap.xml includes the admin page");
 
 const rss = await readFile(path.join(dist, "rss.xml"), "utf8");
 if (!rss.includes("<rss") || !rss.includes("<channel>")) errors.push("rss.xml is invalid");

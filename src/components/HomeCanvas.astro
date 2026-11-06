@@ -130,6 +130,10 @@
   const pointerRepulsionDistance = 20;
   let clouds: CharacterCloud[] = [];
   let readingZones: ReadingZone[] = [];
+  let transitionReadingZones: ReadingZone[] = [];
+  let readingZoneSignature = "";
+  let deferredPlacement = false;
+  const readingPadding = 10;
 
   function seeded(value: number) {
     const raw = Math.sin(value * 12.9898 + 78.233) * 43758.5453;
@@ -751,10 +755,27 @@
     return size * 0.62 + 14;
   }
 
+  function mergeReadingLines(zones: ReadingZone[]) {
+    const lines: ReadingZone[] = [];
+    for (const zone of zones) {
+      const line = lines.find(line => Math.abs(line.y - zone.y) < Math.min(line.height, zone.height) * 0.35);
+      if (!line) { lines.push({ ...zone }); continue; }
+      const right = Math.max(line.x + line.width, zone.x + zone.width);
+      const bottom = Math.max(line.y + line.height, zone.y + zone.height);
+      line.x = Math.min(line.x, zone.x);
+      line.y = Math.min(line.y, zone.y);
+      line.width = right - line.x;
+      line.height = bottom - line.y;
+    }
+    return lines;
+  }
+
   function collectReadingZones(canvasBounds: DOMRect) {
     const zones: ReadingZone[] = [];
     const selectors = [
+      ".hero__inner > .eyebrow",
       ".daily-quote__sizer",
+      ".daily-quote__typing",
       ".daily-quote figcaption",
       ".hero__intro",
       ".hero__link",
@@ -780,7 +801,14 @@
         range.detach();
       }
     });
-    return zones;
+    // Reserve a newly wrapped animation line before all its letters arrive.
+    const quote = hero?.querySelector<HTMLElement>('.daily-quote[data-quote-animation="typing"]');
+    const text = quote?.querySelector(".daily-quote__text")?.getBoundingClientRect();
+    const sizer = quote?.querySelector(".daily-quote__sizer")?.getBoundingClientRect();
+    if (text && sizer && text.bottom > sizer.bottom + 1) {
+      zones.push({ x: text.left - canvasBounds.left, y: sizer.bottom - canvasBounds.top, width: text.width, height: text.bottom - sizer.bottom });
+    }
+    return mergeReadingLines(zones);
   }
 
   function clearsReadingArea(position: { x: number; y: number }, size: number, compact: boolean) {
@@ -891,8 +919,15 @@
     return true;
   }
 
-  function modelPositionRounds(sizes: number[], roundCount: number, compact: boolean) {
+  function modelPositionRounds(sizes: number[], roundCount: number, compact: boolean): Array<Array<{ x: number; y: number }>> {
     const entityCount = sizes.length;
+    // Do not repeatedly search for a full arrangement that cannot fit around
+    // the current text. Plan movement for the number of objects that fits.
+    const available = scatteredPositions(sizes, compact).length;
+    if (available < entityCount) {
+      return available > 0 ? modelPositionRounds(sizes.slice(0, available), roundCount, compact)
+        : Array.from({ length: roundCount }, () => [] as Array<{ x: number; y: number }>);
+    }
     const layoutPool: Array<Array<{ x: number; y: number }>> = [];
     const desiredPoolSize = entityCount >= 5 ? 28 : entityCount === 4 ? 14 : 12;
     const maximumPoolAttempts = entityCount >= 5 ? 90 : entityCount === 4 ? 50 : 40;
@@ -1002,23 +1037,40 @@
     startedAt = performance.now();
   }
 
+  function reflowClouds() {
+    if (!clouds.length) return;
+    const positions = modelPositionRounds(clouds.map(cloud => cloud.size), clouds[0].sequence.length, narrowScreen.matches);
+    clouds = clouds.slice(0, positions[0].length).map((cloud, index) => ({
+      ...cloud, modelPositions: positions.map(round => round[index]),
+    }));
+  }
+
   function resize() {
     if (!canvas || !context) return;
     const bounds = canvas.getBoundingClientRect();
     const nextWidth = Math.max(1, bounds.width);
     const nextHeight = Math.max(1, bounds.height);
     const nextDeviceScale = Math.min(window.devicePixelRatio || 1, 1.5);
-    if (
-      Math.abs(nextWidth - width) < 0.5
-      && Math.abs(nextHeight - height) < 0.5
-      && nextDeviceScale === deviceScale
-    ) return;
+    const dimensionsChanged = Math.abs(nextWidth - width) >= 0.5
+      || Math.abs(nextHeight - height) >= 0.5 || nextDeviceScale !== deviceScale;
+    const languageTransition = Boolean(document.documentElement.dataset.uiLanguageTransition);
+    const currentZones = collectReadingZones(bounds);
+    // Both outgoing and incoming text remain visible during a language fade.
+    if (languageTransition) transitionReadingZones = mergeReadingLines([...transitionReadingZones, ...readingZones]);
+    else transitionReadingZones = [];
+    const nextZones = mergeReadingLines([...transitionReadingZones, ...currentZones]);
+    const signature = nextZones.map(zone => [zone.x, zone.y, zone.width, zone.height].map(value => value.toFixed(1)).join(",")).join(";");
+    if (languageTransition && signature !== readingZoneSignature) deferredPlacement = true;
+    if (!dimensionsChanged && signature === readingZoneSignature && (languageTransition || !deferredPlacement)) return;
+    readingZoneSignature = signature;
     width = nextWidth;
     height = nextHeight;
     deviceScale = nextDeviceScale;
-    canvas.width = Math.round(width * deviceScale);
-    canvas.height = Math.round(height * deviceScale);
-    context.setTransform(deviceScale, 0, 0, deviceScale, 0, 0);
+    if (dimensionsChanged) {
+      canvas.width = Math.round(width * deviceScale);
+      canvas.height = Math.round(height * deviceScale);
+      context.setTransform(deviceScale, 0, 0, deviceScale, 0, 0);
+    }
     canvas.dataset.canvasSize = `${Math.round(width)}x${Math.round(height)}@${deviceScale}`;
     canvas.dataset.canvasMode = "morphing-character-clouds";
     canvas.dataset.glyphMode = "program-symbol-entities";
@@ -1030,13 +1082,19 @@
     canvas.dataset.motionMode = "floating+brownian+model-relocation";
     canvas.dataset.minimumObjectGap = minimumObjectGap.toFixed(2);
     canvas.dataset.layoutSafetyBuffer = String(layoutSafetyBuffer);
-    readingZones = collectReadingZones(bounds);
+    readingZones = nextZones;
     canvas.dataset.readingZones = String(readingZones.length);
     canvas.dataset.readingZoneLayout = readingZones
       .map((zone) => `${zone.x.toFixed(1)},${zone.y.toFixed(1)},${zone.width.toFixed(1)},${zone.height.toFixed(1)}`)
       .join(";");
     const layoutStartedAt = performance.now();
-    makeClouds();
+    // Preserve the objects and their animation when only text has changed.
+    // Relocate unsafe models after the language fade without scattering again.
+    if (dimensionsChanged) makeClouds();
+    else if (!languageTransition && clouds.some(cloud =>
+      cloud.modelPositions.some(position => !clearsReadingArea(position, cloud.size, narrowScreen.matches))
+    )) reflowClouds();
+    if (!languageTransition) deferredPlacement = false;
     canvas.dataset.layoutGenerationMs = (performance.now() - layoutStartedAt).toFixed(1);
     canvas.dataset.availableObjects = shapeKinds.join(",");
     canvas.dataset.librarySize = String(shapeKinds.length);
@@ -1255,13 +1313,20 @@
       context.save();
       context.globalAlpha = 0.48 * labelVisibility;
       context.fillStyle = colors[cloud.color % colors.length];
-      context.font = `650 ${narrowScreen.matches ? 7.8 : 8.8}px ui-sans-serif, system-ui, sans-serif`;
+      context.font = `400 ${narrowScreen.matches ? 10 : 11}px ${styles.getPropertyValue("--font-body").trim()}`;
       context.letterSpacing = narrowScreen.matches ? "0.06em" : "0.08em";
       context.textAlign = "center";
       context.textBaseline = "middle";
       context.fillText(shapeLabels[labelKind], centerX + drift.x, centerY + cloud.size * 0.62 + drift.y);
       context.restore();
     });
+
+    // Initial scatter, morphing and pointer repulsion can exceed a model's
+    // planned outline. Leave a transparent reading area in every painted frame.
+    for (const zone of readingZones) {
+      context.clearRect(zone.x - readingPadding, zone.y - readingPadding,
+        zone.width + readingPadding * 2, zone.height + readingPadding * 2);
+    }
 
     canvas.dataset.formedObjects = String(formedObjects);
     canvas.dataset.currentObjects = currentObjects.join(",");
@@ -1305,7 +1370,17 @@
   if (canvas && context) {
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
-    document.addEventListener("visibilitychange", () => document.hidden ? stop() : start());
+    hero?.querySelectorAll(".hero__inner,.daily-quote__text,.hero__intro,.hero__link").forEach(element => observer.observe(element));
+    document.addEventListener("garden-languagechange", resize);
+    void document.fonts.ready.then(resize);
+    document.fonts.addEventListener("loadingdone", resize);
+    const quote = hero?.querySelector(".daily-quote");
+    if (quote) new MutationObserver(resize).observe(quote, { attributes: true, attributeFilter: ["data-quote-animation"] });
+    new MutationObserver(resize).observe(document.documentElement, { attributes: true, attributeFilter: ["data-ui-language-transition"] });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) stop();
+      else { resize(); start(); }
+    });
     reducedMotion.addEventListener("change", () => {
       stop(reducedMotion.matches ? "static" : "paused");
       draw(performance.now());

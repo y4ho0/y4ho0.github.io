@@ -1,4 +1,7 @@
 ---
+import UiText from "./UiText.astro";
+import { uiAttrs } from "../lib/ui-language";
+
 interface Props {
   autofocus?: boolean;
 }
@@ -8,13 +11,16 @@ const id = `garden-search-${Math.random().toString(36).slice(2)}`;
 ---
 
 <section class="search-interface" data-pagefind-search>
-  <label for={id}>Search public notes, labs, projects, and essays</label>
-  <input id={id} type="search" inputmode="search" autocomplete="off" placeholder="Start typing…" data-search-input autofocus={autofocus} />
-  <p class="search-status" role="status" aria-live="polite" data-search-status>Search loads only when you use it.</p>
+  <label for={id}><UiText zh="搜索公开的笔记、实验、项目与随笔" en="Search public notes, labs, projects, and essays" /></label>
+  <input id={id} type="search" inputmode="search" autocomplete="off" {...uiAttrs({ placeholder: { zh: "开始输入…", en: "Start typing…" } })} data-search-input autofocus={autofocus} />
+  <p class="search-status" role="status" aria-live="polite" data-search-status><UiText zh="使用搜索时才会加载索引。" en="Search loads only when you use it." /></p>
   <ol class="search-results" data-search-results></ol>
 </section>
 
 <script>
+  import { searchQuery } from "../lib/search-query";
+  import { setUiMessage } from "../lib/ui-language";
+
   interface PagefindData {
     url: string;
     excerpt: string;
@@ -52,14 +58,14 @@ const id = `garden-search-${Math.random().toString(36).slice(2)}`;
       if (!list || !status) return;
       list.replaceChildren();
       if (query.length < 2) {
-        status.textContent = "Enter at least two characters.";
+        setUiMessage(status, "请输入至少两个字符。", "Enter at least two characters.");
         return;
       }
 
-      status.textContent = "Searching…";
+      setUiMessage(status, "正在搜索…", "Searching…");
       try {
         const pagefind = await loadPagefind();
-        const response = await pagefind.search(query);
+        const response = await pagefind.search(searchQuery(query));
         const data = await Promise.all(response.results.slice(0, 12).map((result) => result.data()));
         if (version !== searchVersion) return;
         for (const item of data) {
@@ -74,9 +80,10 @@ const id = `garden-search-${Math.random().toString(36).slice(2)}`;
           row.append(link);
           list.append(row);
         }
-        status.textContent = data.length === 0 ? "No public content matched." : `${data.length} result${data.length === 1 ? "" : "s"}.`;
+        if (data.length === 0) setUiMessage(status, "没有找到匹配的公开内容。", "No public content matched.");
+        else setUiMessage(status, `${data.length} 条结果。`, `${data.length} result${data.length === 1 ? "" : "s"}.`);
       } catch {
-        status.textContent = "Search is unavailable in this preview. The published site builds its index after the pages.";
+        setUiMessage(status, "当前预览暂时无法搜索。正式站点会在页面构建后生成索引。", "Search is unavailable in this preview. The published site builds its index after the pages.");
       }
     });
   });

@@ -4,14 +4,20 @@ import rehypeKatex from "rehype-katex";
 import remarkDirective from "remark-directive";
 import remarkMath from "remark-math";
 import remarkContentBlocks from "./src/plugins/remark-content-blocks.mjs";
+import remarkKnowledgeTools from "./src/plugins/remark-knowledge-tools.mjs";
 
 export default defineConfig({
   site: "https://y4ho0.github.io",
   output: "static",
   trailingSlash: "always",
+  // Pages serves public assets with CORS enabled. Match that for opaque preview
+  // frames locally so self-hosted body fonts load without allowing frame scripts.
+  server: { headers: { "Access-Control-Allow-Origin": "*" } },
+  // Admin's strict CSP permits self-hosted scripts, never automatic inline JS.
+  vite: { build: { assetsInlineLimit: (filePath) => filePath.endsWith(".js") ? false : undefined } },
   markdown: {
     processor: unified({
-      remarkPlugins: [remarkMath, remarkDirective, remarkContentBlocks],
+      remarkPlugins: [remarkMath, remarkDirective, remarkContentBlocks, remarkKnowledgeTools],
       rehypePlugins: [[rehypeKatex, { output: "htmlAndMathml", trust: false, strict: "warn" }]],
     }),
     shikiConfig: {

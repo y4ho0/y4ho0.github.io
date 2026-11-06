@@ -1,6 +1,9 @@
 ---
 import BaseLayout from "./BaseLayout.astro";
+import UiText from "../components/UiText.astro";
+import { uiAttrs } from "../lib/ui-language";
 import "katex/dist/katex.min.css";
+import "../styles/knowledge-tools.css";
 import Breadcrumbs from "../components/Breadcrumbs.astro";
 import RelatedContent from "../components/RelatedContent.astro";
 import TableOfContents from "../components/TableOfContents.astro";
@@ -9,13 +12,15 @@ import { collectionLabel } from "../lib/content-routing";
 
 interface Props {
   entry: AnyContentEntry;
-  breadcrumbs: { label: string; href?: string }[];
+  breadcrumbs: { label: string; labelEn?: string; href?: string }[];
   related?: AnyContentEntry[];
   headings?: { depth: number; slug: string; text: string }[];
 }
 
 const { entry, breadcrumbs, related = [], headings = [] } = Astro.props;
 const publishedAt = entry.data.publishedAt;
+const collectionZh = { courses: "课程", notes: "笔记", labs: "实验", projects: "项目", essays: "随笔" };
+const statusLabels = { seedling: { zh: "萌芽", en: "Seedling" }, growing: { zh: "成长", en: "Growing" }, evergreen: { zh: "常青", en: "Evergreen" } };
 ---
 
 <BaseLayout title={entry.data.title} description={entry.data.description} canonicalPath={Astro.url.pathname} type="article" publishedAt={publishedAt} updatedAt={entry.data.updatedAt}>
@@ -26,15 +31,15 @@ const publishedAt = entry.data.publishedAt;
     {"course" in entry.data && entry.data.course && <span data-filter-value={entry.data.course.id} data-pagefind-filter="course[data-filter-value]" data-pagefind-ignore></span>}
     <Breadcrumbs items={breadcrumbs} />
     <header class="article-header">
-      <p class="eyebrow">{entry.collection.slice(0, -1)}</p>
+      <p class="eyebrow"><UiText zh={collectionZh[entry.collection]} en={collectionLabel(entry.collection)} /></p>
       <h1 data-pagefind-meta="title">{entry.data.title}</h1>
       <p data-pagefind-meta="description">{entry.data.description}</p>
       <dl class="article-meta">
-        <div><dt>Status</dt><dd>{entry.data.status}</dd></div>
-        {publishedAt && <div><dt>Published</dt><dd><time datetime={publishedAt.toISOString()}>{publishedAt.toLocaleDateString("en-CA")}</time></dd></div>}
-        <div><dt>Updated</dt><dd><time datetime={entry.data.updatedAt.toISOString()}>{entry.data.updatedAt.toLocaleDateString("en-CA")}</time></dd></div>
+        <div><dt><UiText zh="成长状态" en="Status" /></dt><dd><UiText {...statusLabels[entry.data.status]} /></dd></div>
+        {publishedAt && <div><dt><UiText zh="发布于" en="Published" /></dt><dd><time datetime={publishedAt.toISOString()} data-ui-date={publishedAt.toISOString()}>{publishedAt.toLocaleDateString("zh-CN", { timeZone: "UTC" })}</time></dd></div>}
+        <div><dt><UiText zh="更新于" en="Updated" /></dt><dd><time datetime={entry.data.updatedAt.toISOString()} data-ui-date={entry.data.updatedAt.toISOString()}>{entry.data.updatedAt.toLocaleDateString("zh-CN", { timeZone: "UTC" })}</time></dd></div>
       </dl>
-      {entry.data.tags.length > 0 && <ul class="tag-list" aria-label="Tags">{entry.data.tags.map((tag) => <li>{tag}</li>)}</ul>}
+      {entry.data.tags.length > 0 && <ul class="tag-list" {...uiAttrs({ "aria-label": { zh: "标签", en: "Tags" } })}>{entry.data.tags.map((tag) => <li>{tag}</li>)}</ul>}
     </header>
     <div class="article-reading-grid">
       <div class="prose" data-pagefind-body>
@@ -48,25 +53,131 @@ const publishedAt = entry.data.publishedAt;
 </BaseLayout>
 
 <script>
+  import { setUiMessage, setUiAttribute } from "../lib/ui-language";
+
   document.querySelectorAll<HTMLElement>(".prose pre").forEach((block) => {
     if (block.querySelector(".code-copy")) return;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "code-copy";
-    button.textContent = "Copy";
-    button.setAttribute("aria-label", "Copy code");
+    setUiMessage(button, "复制", "Copy");
+    setUiAttribute(button, "aria-label", "复制代码", "Copy code");
     button.addEventListener("click", async () => {
       const code = block.querySelector("code")?.textContent ?? "";
       try {
         await navigator.clipboard.writeText(code);
-        button.textContent = "Copied";
+        setUiMessage(button, "已复制", "Copied");
       } catch {
-        button.textContent = "Select to copy";
+        setUiMessage(button, "请选中代码复制", "Select to copy");
       }
-      window.setTimeout(() => (button.textContent = "Copy"), 1800);
+      window.setTimeout(() => setUiMessage(button, "复制", "Copy"), 1800);
     });
     block.append(button);
   });
+
+  // One delegated handler for every inline note: real text in the card is
+  // selectable. Pointer selection pins it until a click outside or Escape.
+  const termRoot = document.querySelector<HTMLElement>(".article-shell");
+  let opened: HTMLElement | null = null;
+  let pinned = false;
+  let leaveTimer = 0;
+  const clearLeave = () => window.clearTimeout(leaveTimer);
+  const closeTerm = () => {
+    clearLeave();
+    if (opened) {
+      opened.classList.remove("is-open");
+      opened.querySelector<HTMLElement>(".term-note__trigger")?.setAttribute("aria-expanded", "false");
+    }
+    opened = null;
+    pinned = false;
+  };
+  const revealTerm = (term: HTMLElement) => {
+    clearLeave();
+    if (opened !== term) {
+      closeTerm();
+      opened = term;
+    }
+    term.classList.add("is-open");
+    term.querySelector<HTMLElement>(".term-note__trigger")?.setAttribute("aria-expanded", "true");
+    const trigger = term.querySelector<HTMLElement>(".term-note__trigger");
+    const panel = term.querySelector<HTMLElement>(".term-note__panel");
+    if (!trigger || !panel) return;
+    const triggerBox = trigger.getBoundingClientRect();
+    term.dataset.side = triggerBox.left > window.innerWidth * .6 ? "right" : "left";
+    delete term.dataset.placement;
+    // The article uses an anchored card; small/touch screens use a fixed card
+    // controlled by CSS, so desktop-only placement is enough.
+    if (window.matchMedia("(hover: hover) and (min-width: 40.01rem)").matches) {
+      const panelBox = panel.getBoundingClientRect();
+      if (panelBox.bottom > window.innerHeight - 12
+        && triggerBox.top > panelBox.height + 16) term.dataset.placement = "top";
+    }
+  };
+  const scheduleClose = () => {
+    clearLeave();
+    leaveTimer = window.setTimeout(() => {
+      if (opened && !pinned
+        && !opened.contains(document.activeElement)
+        && !opened.matches(":hover")) closeTerm();
+    }, 220);
+  };
+
+  termRoot?.addEventListener("pointerover", event => {
+    if (!window.matchMedia("(hover: hover)").matches) return;
+    const term = (event.target as Element).closest<HTMLElement>(".term-note");
+    if (term) revealTerm(term);
+  });
+  termRoot?.addEventListener("pointerout", event => {
+    const term = (event.target as Element).closest<HTMLElement>(".term-note");
+    if (!term || term.contains(event.relatedTarget as Node | null)) return;
+    if (!pinned) scheduleClose();
+  });
+  termRoot?.addEventListener("focusin", event => {
+    const trigger = (event.target as Element).closest<HTMLElement>(".term-note__trigger");
+    const term = trigger?.closest<HTMLElement>(".term-note");
+    if (term) revealTerm(term);
+  });
+  termRoot?.addEventListener("focusout", event => {
+    const trigger = (event.target as Element).closest<HTMLElement>(".term-note__trigger");
+    if (trigger && !pinned) scheduleClose();
+  });
+  document.addEventListener("pointerdown", event => {
+    const target = event.target as Element;
+    if (target.closest(".term-note__panel")) {
+      // Keep the note visible during drag-selection and Cmd/Ctrl+C.
+      pinned = true;
+      clearLeave();
+    } else if (!target.closest(".term-note")) closeTerm();
+  });
+  termRoot?.addEventListener("click", event => {
+    const target = event.target as Element;
+    // Crucial: clicking/selecting inside the explanatory card must not
+    // redirect focus to the trigger or collapse the native selection.
+    if (target.closest(".term-note__panel")) return;
+    const trigger = target.closest<HTMLElement>(".term-note__trigger");
+    const term = trigger?.closest<HTMLElement>(".term-note");
+    if (!term || !trigger) return;
+    revealTerm(term);
+    pinned = true;
+    trigger.focus({ preventScroll: true });
+  });
+  termRoot?.addEventListener("keydown", event => {
+    const trigger = (event.target as Element).closest<HTMLElement>(".term-note__trigger");
+    const term = trigger?.closest<HTMLElement>(".term-note");
+    if (term && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      revealTerm(term);
+      pinned = true;
+    }
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key !== "Escape" || !opened) return;
+    event.preventDefault();
+    const trigger = opened.querySelector<HTMLElement>(".term-note__trigger");
+    closeTerm();
+    if (trigger === document.activeElement) trigger?.blur();
+  });
+  window.addEventListener("pageswap", closeTerm);
 
   const article = document.querySelector<HTMLElement>(".article-shell");
   const progress = document.querySelector<HTMLElement>(".reading-progress span");
@@ -76,12 +187,12 @@ const publishedAt = entry.data.publishedAt;
 
   headings.forEach((heading) => {
     if (heading.querySelector(".heading-anchor")) return;
-    const label = heading.textContent?.trim() || "section";
+    const label = heading.textContent?.trim();
     const anchor = document.createElement("a");
     anchor.className = "heading-anchor";
     anchor.href = `#${heading.id}`;
     anchor.textContent = "#";
-    anchor.setAttribute("aria-label", `Link to ${label}`);
+    setUiAttribute(anchor, "aria-label", `跳转到${label || "章节"}`, `Link to ${label || "section"}`);
     heading.append(anchor);
   });
 

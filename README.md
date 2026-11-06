@@ -29,6 +29,8 @@ Content lives in Astro Content Collections under `src/content/`:
 
 Draft entries are validated but excluded from production routes, feeds, sitemaps, archives, and search.
 
+Browser-based article management is available at `/admin/`. See [后台使用与认证配置](ADMIN_GUIDE.md) for local drafts, GitHub publishing, editor layouts, security limits, and validation steps.
+
 Notes, labs, projects, and essays may opt into the homepage post-location map. The `region` key groups entries at the same place, so its name and coordinates must remain consistent:
 
 ```yaml
@@ -59,9 +61,31 @@ Supported block names are `theorem`, `proof`, `definition`, `lemma`, `propositio
 
 The public site avoids personal identity, education, residence, contact, résumé, employment, competition, research, internship, and skill-rating information. Optional post-location metadata represents only an explicitly chosen publication location; it must not be used to infer or publish a home address. The About page documents only the site itself.
 
+## Interface language
+
+Public pages default to Simplified Chinese. Use the **中文 / EN** control in the desktop header or mobile menu to switch to English; the preference is saved as `garden-language` in localStorage and applies across pages. The Yahoo wordmark and navigation align to the left; search uses a magnifying-glass icon and retains its keyboard shortcuts. 中文 / EN buttons have equal sizes, and ordinary site text, display headings, quotations, metadata, and the header/footer use LXGW WenKai Screen. Code and KaTeX retain their dedicated families. Landing pages use the section name as their main heading, with concise functional descriptions; quotation authors use 16px text. Theme controls use monitor / sun / moon icons with translated tooltips and accessible names. The shared palette eases once at the root over 720ms with a cubic-bezier curve, so nested text inherits the same current colors without a second animation or end-of-transition flash; controls remain interactive; reduced-motion preferences switch immediately.
+
+On narrow screens, the menu puts the search icon directly to the left of Close, with six section links in two columns (three in short landscape windows). Theme and language settings stay on single rows with at least 44px tap targets. The menu header stays reachable while its contents scroll; open menus and search dialogs lock background scrolling, and a stable scrollbar gutter avoids horizontal shifts. Homepage decorations refresh their reading areas after language, font and text-layout changes. Every canvas frame leaves text areas transparent, including during scatter and pointer interaction; safe existing objects keep their animation progress when relocated.
+
+Control highlights read the head-initialized language/theme preference directly, so full-page navigation does not briefly highlight the static System / Chinese defaults while modules load. Public pages and the admin preload the same content-hashed WenKai subset, covering fixed page/admin text and common Latin characters. This face leads the body and control font stacks; the complete body subsets use a short `font-display: block` period so initial text waits briefly for WenKai instead of first painting a different family. Code/math fonts stay separate. If a font fails or loading exceeds the browser’s block period, readable fallback text remains available; there is no JavaScript page-hiding gate. Generation and coverage are documented in `public/fonts/lxgw-wenkai-screen/README.md`. Browsers without registered CSS color properties still switch correctly, with an immediate palette change.
+
+Public-page links use native cross-document View Transitions: a 220ms eased fade keeps the header in place, with menus and search dialogs closed before the outgoing snapshot. This retains normal document initialization, history and scrolling without a client router. Reduced-motion users, unsupported browsers, reloads and the `/admin/` boundary keep ordinary navigation. Decorative homepage whitespace suppresses accidental word/paragraph selection from rapid repeated clicks; normal text selection remains available, and an existing selection no longer disables subsequent whitespace click effects.
+
+Language switching updates interface labels, page titles, descriptions, search messages, and date formatting without reloading the page. User clicks use a 260ms eased crossfade on translated text, including labels in the header and open menus. Text and the garden link's accompanying arrow are captured, keeping controls interactive and retaining the same DOM nodes and input state; rapid changes keep the latest choice. The arrow moves and fades with its label. Browsers without same-document View Transitions gently reveal the text and arrow over 200ms. Reduced-motion users switch immediately, and initialization, history restoration and cross-tab synchronization do not animate. Article titles, summaries, Markdown, tags, place names, daily quotes, and friend profiles remain in their original language. URLs, content schemas, RSS and sitemap routes are unchanged. The management interface at `/admin/` continues to use Chinese.
+
+Static output and search indexing use the default Chinese interface plus original article content. The alternate English UI text is excluded from Pagefind so labels are not indexed twice. Search queries make CJK word boundaries explicit so Chinese search also works when Pagefind is first loaded in English mode; this does not translate queries or content. No translation service or runtime dependency is added. Without JavaScript, the public pages remain readable in Chinese.
+
+The globe uses 10,000 samples with COBE's original renderer and regular point distribution. Its original palette, brightness, geographic texture, markers, dragging and keyboard controls are retained. A credit below the globe links to the COBE website and its author.
+
+## Friend links
+
+Friend links appear on `/about/`. Add or update entries in `src/data/friends.ts` using `title`, optional `description`, `avatarUrl`, and `link`. Cards follow the site's typography and light/dark theme.
+
 ## Deployment
 
 GitHub Actions builds and deploys the contents of `dist/` to GitHub Pages on pushes to `main`, manual runs, and the daily 00:10 Asia/Shanghai schedule. Pull requests run the same checks without uploading or deploying a production artifact. The workflow does not create automated commits or push generated quote state to Git.
+
+Before deploying, the job checks that its commit is still the current `main` revision. Outdated runs skip deployment so an earlier, slower build cannot replace a newer release.
 
 Before the first deployment, change **Settings → Pages → Build and deployment → Source** from the legacy `gh-pages` branch to **GitHub Actions**. This repository intentionally does not change that remote setting itself.
 

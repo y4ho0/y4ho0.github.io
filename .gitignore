@@ -22,4 +22,6 @@ public/data/daily-quote.json
 
 # test and coverage output
 coverage/
+playwright-report/
+test-results/
 .cache/
